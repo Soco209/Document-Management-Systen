@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Dashboard - Document Submission System</title>
+  <link rel="stylesheet" href="user.css">
+  <script>
+   
+    (function() {
+        try {
+            const userData = localStorage.getItem('userData') || sessionStorage.getItem('userData');
+            if (!userData || JSON.parse(userData).role !== 'student') {
+                // Use replace to avoid breaking the back button history.
+                window.location.replace('/student_affairs/Login/login.html');
+            }
+        } catch (e) {
+            console.error('Auth guard error:', e);
+            window.location.replace('/student_affairs/Login/login.html');
+        }
+    })();
+  </script>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="item header">
+      <div class="logo">
+        <div class="logo-icon"><img src="/student_affairs/Image/logoJH.png"></div>
+        <div>
+          <h1>Document Submission System</h1>
+          <p>Department Of Student Affairs</p>
+        </div>
+      </div>
+      <div class="user-info">
+        <span id="studentWelcome" aria-live="polite">Welcome, Student</span>
+        <div class="user-icon" aria-label="Student Profile">S</div>
+      </div>
+    </div>
+
+    <!-- Main Layout -->
+    <div class="main-layout">
+      <!-- Sidebar -->
+      <div class="item-sidebar" role="navigation" aria-label="Student Navigation">
+        <nav class="sidebar-nav"> 
+          <ul>
+            <li><a href="#" class="nav-link active" data-section="dashboard">
+              <span>📊 Dashboard</span>
+            </a></li>
+            
+            <li><a href="#" class="nav-link" data-section="new-request">
+              <span>📝 New Request</span>
+            </a></li>
+            
+            <li><a href="#" class="nav-link" data-section="apply-document">
+              <span>📄 Apply Document</span>
+            </a></li>
+
+            <li><button id="studentLogoutBtn" class="btn logout">
+              <span>🚪 Logout</span>
+            </button></li>
+          </ul>
+        </nav>
+      </div>
+
+      <!-- Main Content -->
+      <div class="item content">
+        <!-- Dashboard Section -->
+        <section id="dashboard" aria-labelledby="dashboard-heading">
+          <h2 id="dashboard-heading">Student Dashboard</h2>
+          <p class="subtext">Overview of your document requests and submission status.</p>
+
+          <!-- Status Cards -->
+          <div class="status-cards">
+            <div class="card card-total">
+              <div class="card-icon">Σ</div>
+              <div class="card-content"><p>Total Requests</p><h3 id="studentTotal">0</h3></div>
+            </div>
+            <div class="card card-pending">
+              <div class="card-icon">!</div>
+              <div class="card-content"><p>Pending</p><h3 id="studentPending">0</h3></div>
+            </div>
+            <div class="card card-processing">
+              <div class="card-icon">⟳</div>
+              <div class="card-content"><p>Processing</p><h3 id="studentProcessing">0</h3></div>
+            </div>
+            <div class="card card-completed">
+              <div class="card-icon">✓</div>
+              <div class="card-content"><p>Completed</p><h3 id="studentCompleted">0</h3></div>
+            </div>
+          </div>
+
+          <!-- Requests Table -->
+          <div class="table-section">
+            <div class="table-header">
+              <h3>My Document Requests</h3>
+              <select id="studentStatusFilter" aria-label="Filter requests by status">
+                <option value="">All Statuses</option>
+                <option value="Pending">Pending</option>
+                <option value="Processing">Processing</option>
+                <option value="Completed">Completed</option>
+                <option value="Rejected">Rejected</option>
+                <option value="Requires Action">Requires Action</option>
+              </select>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Request ID</th>
+                  <th>Document Type</th>
+                  <th>Date Submitted</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="studentTableBody">
+                <!-- Rows injected by JS -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- New Request Section -->
+        <section id="new-request" aria-labelledby="new-request-heading" hidden>
+          <h2 id="new-request-heading">New Document Request</h2>
+          <p class="subtext">Submit a new document request with template preview.</p>
+
+          <div class="table-section">
+            <div class="doc-type-section">
+              <h4>Request Document</h4>
+              <form id="newRequestForm">
+                <div class="form-group">
+                  <label for="requestDocType">Document Type</label>
+                  <select id="requestDocType" required>
+                    <option value="">Select Document Type</option>
+                    <!-- Options populated by JS -->
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label>Document Template Preview</label>
+                  <div class="template-preview" id="templatePreviewContainer">
+                    <div class="template-preview-content">
+                      <p class="preview-placeholder">Select a document type to see the template preview.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="requestPurpose">Purpose of Request</label>
+                  <textarea id="requestPurpose" placeholder="Please specify the purpose for requesting this document..." required></textarea>
+                </div>
+
+                <div class="form-group">
+                  <label for="additionalNotes">Additional Notes (Optional)</label>
+                  <textarea id="additionalNotes" placeholder="Any additional information or special requests..."></textarea>
+                </div>
+
+                <div class="modal-actions">
+                  <button type="button" id="cancelRequest" class="btn gray">Cancel</button>
+                  <button type="submit" id="submitNewRequest" class="btn blue">Submit Request</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <!-- Apply Document Section -->
+        <section id="apply-document" aria-labelledby="apply-document-heading" hidden>
+          <h2 id="apply-document-heading">Apply for Document</h2>
+          <p class="subtext">Submit required documents for your application request.</p>
+
+          <div class="apply-document-section">
+            <div class="doc-type-section">
+              <h4>Application Request</h4>
+              <form id="applyDocumentForm">
+                <div class="form-group">
+                  <label for="applyDocType">Document Type</label>
+                  <select id="applyDocType" required>
+                    <option value="">Select Document Type</option>
+                    <!-- Options populated by JS -->
+                  </select>
+                </div>
+
+                <!-- Dynamic Form Fields -->
+                <div id="applicationFormFields">
+                  <!-- Fields populated by JS based on document type -->
+                </div>
+
+                <!-- Upload Requirements -->
+                <div class="form-group">
+                  <label>Required Documents</label>
+                  <div id="uploadRequirementsList" class="upload-requirements-list">
+                    <!-- Requirements populated by JS -->
+                  </div>
+                  <!-- Hidden file input for requirement-specific uploads -->
+                  <input type="file" id="requirementFileInput" style="display: none;" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
+                </div>
+
+                <div class_="modal-actions">
+                  <button type="button" id="cancelApply" class="btn gray">Cancel</button>
+                  <button type="submit" id="submitApplyRequest" class="btn green">Submit Application</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- Request Details Modal -->
+  <div id="detailsModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-heading">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-heading">Request Details</h3>
+      </div>
+      <div id="modalContent" class="modal-body">
+        <!-- Content populated by JS -->
+      </div>
+      <div class="modal-actions">
+        <button id="closeModal" class="btn gray">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirmation Modal -->
+  <div id="confirmModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="confirmModal-heading">
+    <div class="modal-content">
+      <h3 id="confirmModal-heading">Confirm Submission</h3>
+      <div id="confirmModalContent" class="modal-body">
+        <p>Are you sure you want to submit this request?</p>
+      </div>
+      <div class="modal-actions">
+        <button id="cancelConfirm" class="btn gray">Cancel</button>
+        <button id="confirmSubmit" class="btn blue">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="user.js"></script>
+</body>
+</html>

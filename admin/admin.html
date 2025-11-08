@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - Document Submission System</title>
+  <link rel="icon" type="image/png" href="/student_affairs/Image/logoJH.png">
+  <link rel="stylesheet" href="admin.css">
+  <script>
+    // Anti-flicker guard: Redirect if not logged in as an admin.
+    // This runs before the page content is rendered.
+    (function() {
+        try {
+            const userData = localStorage.getItem('userData') || sessionStorage.getItem('userData');
+            if (!userData || JSON.parse(userData).role !== 'admin') {
+                // Use replace to avoid breaking the back button history.
+                window.location.replace('/student_affairs/Login/login.html');
+            }
+        } catch (e) {
+            console.error('Auth guard error:', e);
+            window.location.replace('/student_affairs/Login/login.html');
+        }
+    })();
+  </script>
+</head>
+<body>
+  <!-- ======================
+       LAYOUT CONTAINER (PER USER SPEC - UPDATED FOR STABLE ALIGNMENT)
+       ====================== -->
+  <div class="container">
+   <!-- Item 1: Header (Full Width) -->
+    <div class="item header">
+      <div class="logo">
+        <!-- Logo icon without SVG -->
+        <div class="logo-icon"><img src="/student_affairs/Image/logoJH.png"></div>
+        <div>
+          <h1>Document Submission System</h1>
+          <p>Department Of Student Affairs</p>
+        </div>
+      </div>
+      
+      <div class="user-info">
+        <span id="adminWelcome" aria-live="polite">Welcome, admin123</span>
+        <div class="user-icon" aria-label="User Profile">A</div>
+      </div>
+    </div>
+
+    <!-- Sub-Layout: Sidebar + Content (Side-by-Side) -->
+    <div class="main-layout">
+      <!-- Item 2: Sidebar (25% Width - Important Functionalities) -->
+       <div class="item-sidebar" role="navigation" aria-label="Admin Navigation">
+        <nav class="sidebar-nav"> 
+          <ul>
+            <li><a href="#" class="nav-link active" data-section="dashboard">
+              <span>📊 Dashboard</span>
+            </a></li>
+            
+            <!-- User Management Section -->
+            <li><a href="#" class="nav-link" data-section="registered-users">
+              <span>👥 Registered Users</span>
+            </a></li>
+            
+            <!-- Management Section -->
+            <li><a href="#" class="nav-link" data-section="users">
+              <span>⚙️ System Management</span>
+            </a></li>
+
+            <li><button id="adminLogoutBtn" class="btn logout">
+              <span>🚪 Logout</span>
+            </button></li>
+          </ul>
+        </nav>
+       </div>
+
+     <!-- Item 3: Main Content (Fills Remaining Space) -->
+      <div class="item content">
+        <section id="dashboard" aria-labelledby="dashboard-heading">
+          <h2 id="dashboard-heading">Dashboard</h2>
+          <p class="subtext">Overview of document requests and system status.</p>
+
+          <!-- Status Cards -->
+          <div class="status-cards">
+            <div class="card card-total">
+              <div class="card-icon">Σ</div>
+              <div class="card-content"><p>Total Requests</p><h3 id="adminTotal">12</h3></div>
+            </div>
+            <div class="card card-pending">
+              <div class="card-icon">!</div>
+              <div class="card-content"><p>Pending</p><h3 id="adminPending">5</h3></div>
+            </div>
+            <div class="card card-processing">
+              <div class="card-icon">⟳</div>
+              <div class="card-content"><p>Processing</p><h3 id="adminProcessing">3</h3></div>
+            </div>
+            <div class="card card-completed">
+              <div class="card-icon">✓</div>
+              <div class="card-content"><p>Completed</p><h3 id="adminCompleted">4</h3></div>
+            </div>
+          </div>
+
+          <!-- Table Section -->
+          <div class="table-section">
+            <div class="table-header">
+              <h3>All Requests</h3>
+              <select id="adminStatusFilter" aria-label="Filter requests by status">
+                <option value="">All Statuses</option>
+                <option value="pending">Pending</option>
+                <option value="processing">Processing</option>
+                <option value="completed">Completed</option>
+                <option value="rejected">Rejected</option>
+                <option value="requires action">Requires Action</option>
+              </select>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Student</th>
+                  <th>Document</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="adminTableBody">
+                <!-- Rows injected by JS -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Registered Users Section (Initially Hidden) -->
+        <section id="registered-users" aria-labelledby="registered-users-heading" hidden>
+          <h2 id="registered-users-heading">Registered Users</h2>
+          <p class="subtext">Manage all registered users in the system.</p>
+
+          <!-- Users Table Section -->
+          <div class="table-section">
+            <div class="table-header">
+              <h3>All Users</h3>
+              <select id="userRoleFilter" aria-label="Filter users by role">
+                <option value="">All Roles</option>
+                <option value="admin">Admin</option>
+                <option value="student">Student</option>
+              </select>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Registration Date</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="usersTableBody">
+                <!-- Fallback message if empty -->
+                <tr class="empty-state">
+                  <td colspan="5" class="no-data">No users found. <button id="refreshUsersBtn" class="btn blue">Refresh</button></td>
+                </tr>
+                <!-- Rows injected by JS -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- System Management Section (Initially Hidden) -->
+        <section id="users" aria-labelledby="users-heading" hidden>
+          <h2 id="users-heading">System Management</h2>
+          <p class="subtext">Manage document types and system settings.</p>
+
+          <!-- Document Types Management -->
+          <div class="table-section">
+           <div class="doc-type-section">
+              <h4>Manage Document Types</h4>
+              <form id="addDocTypeForm">
+                <div class="add-doc-type-wrapper">
+                  <label for="newDocTypeInput" class="sr-only">Add new document type</label>
+                  <input type="text" id="newDocTypeInput" placeholder="New document type..." required>
+                  <button type="submit" id="addDocTypeBtn" class="btn blue" aria-label="Add Document Type">
+                    <span>+ Add</span> 
+                  </button>
+                </div>
+              </form>
+              <label for="searchDocTypeInput" class="sr-only">Search document types</label>
+              <input type="text" id="searchDocTypeInput" placeholder="Search document types...">
+              <ul id="docTypeList" role="list" aria-label="Document Types List">
+                <!-- Document types will be added here dynamically -->
+              </ul>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================
+       MODALS
+       ====================== -->
+
+  <!-- Modal for Viewing Request Details and Updating Status -->
+  <div id="detailsModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-heading">
+    <div class="modal-content">
+      <h3 id="modal-heading">Request Details & Status Update</h3>
+      <div id="modalContent" class="modal-body">
+        <div class="loading-state">Loading details...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for Editing User -->
+  <div id="userModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="userModal-heading">
+    <div class="modal-content">
+      <h3 id="userModal-heading">Edit User</h3>
+      <div id="userModalContent" class="modal-body">
+        <div class="form-group">
+          <label for="editUserName">Full Name</label>
+          <input type="text" id="editUserName" placeholder="Enter full name">
+        </div>
+        <div class="form-group">
+          <label for="editUserEmail">Email</label>
+          <input type="email" id="editUserEmail" placeholder="Enter email address">
+        </div>
+        <div class="form-group">
+          <label for="editUserRole">Role</label>
+          <select id="editUserRole">
+            <option value="student">Student</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="editUserStatus">Status</label>
+          <select id="editUserStatus">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="closeUserModal" class="btn gray">Cancel</button>
+        <button id="saveUserBtn" class="btn blue">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for Viewing User Details -->
+  <div id="userDetailsModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="userDetailsModal-heading">
+    <div class="modal-content">
+      <h3 id="userDetailsModal-heading">User Details</h3>
+      <div id="userDetailsModalContent" class="modal-body">
+        <div class="loading-state">Loading details...</div>
+      </div>
+      <div class="modal-actions">
+        <button id="closeUserDetailsModal" class="btn gray">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for Editing Document Type -->
+  <div id="docTypeModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="docTypeModal-heading">
+    <div class="modal-content">
+      <h3 id="docTypeModal-heading">Edit Document Type</h3>
+      <div id="docTypeModalContent" class="modal-body">
+        <div class="form-group">
+          <label for="editDocTypeName">Document Type Name</label>
+          <input type="text" id="editDocTypeName" placeholder="Enter document type name">
+        </div>
+        
+        <div class="form-group">
+          <label>Document Template</label>
+          <div class="current-template" id="currentTemplateContainer">
+            <!-- Current template info will be displayed here -->
+          </div>
+          <label for="templateFileInput">Upload New Template</label>
+          <div id="fileUploadArea" class="file-upload-area">
+            <input type="file" id="templateFileInput" class="file-input-simple" accept=".pdf,.docx">
+      </div>
+       <div class="form-group">
+          <label>Manage Requirements</label>
+          <div id="requirementsContainer">
+            <!-- Requirements will be loaded here -->
+          </div>
+          <div class="add-requirement-wrapper">
+            <label for="newRequirementInput" class="sr-only">Add new requirement</label>
+            <input type="text" id="newRequirementInput" class="new-requirement-input" placeholder="New requirement name...">
+            <button type="button" id="addRequirementBtn" class="btn green">Add</button>
+          </div>
+        </div>
+      <div class="modal-actions">
+        <button id="closeDocTypeModal" class="btn gray">Cancel</button>
+        <button id="saveDocTypeBtn" class="btn blue">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+ <!-- ======================
+       SCRIPTS
+       ====================== -->
+  <script src="/student_affairs/admin/admin.js"></script>
+ </body>
+</html>
