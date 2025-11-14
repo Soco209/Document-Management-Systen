@@ -56,7 +56,7 @@
         }
         .button, .button:visited {
             display: inline-block;
-            padding: 12px 190px;
+            padding: 0.5rem 2rem;
             margin: 20px 0;
             background-color: #00b33fff; /* A slightly lighter blue */
             color: #ffffff !important;
