@@ -1,5 +1,5 @@
 {
     "require": {
-        "getbrevo/brevo-php": "1.x.x"
+        "notificationapi/notificationapi-php-server-sdk": "^1.0"
     }
 }

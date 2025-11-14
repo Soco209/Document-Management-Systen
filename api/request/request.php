@@ -153,53 +153,33 @@ try {
             if ($executionResult && $rowCount > 0) {
                 // Notify student
                 error_log("Update successful, trying to notify student.");
-                $userQuery = "SELECT u.full_name, u.email FROM users u JOIN requests r ON u.id = r.student_id WHERE r.request_id = :request_id";
+                
+                // Updated query to get all necessary info for the new email function
+                $userQuery = "SELECT u.id as user_id, u.full_name, u.email, dt.name as document_name
+                              FROM users u 
+                              JOIN requests r ON u.id = r.student_id 
+                              JOIN document_types dt ON r.document_type_id = dt.id
+                              WHERE r.request_id = :request_id";
+                
                 $userStmt = $db->prepare($userQuery);
                 $userStmt->bindParam(':request_id', $requestId);
                 $userStmt->execute();
                 $userRow = $userStmt->fetch(PDO::FETCH_ASSOC);
 
                 if ($userRow) {
-                    error_log("User found, preparing to send email.");
+                    error_log("User found, preparing to send email with NotificationAPI.");
+                    
+                    // Include the email utility file
+                    require_once __DIR__ . '/../../utils/email.php';
 
-                    // --- Fetch Admin Email (Sender) ---
-                    $adminQuery = "SELECT email, full_name FROM users WHERE role = 'admin' LIMIT 1";
-                    $adminStmt = $db->prepare($adminQuery);
-                    $adminStmt->execute();
-                    $adminRow = $adminStmt->fetch(PDO::FETCH_ASSOC);
-                    $adminEmail = $adminRow ? $adminRow['email'] : 'default-admin@example.com';
-                    $adminName = $adminRow ? $adminRow['full_name'] : 'Default Admin';
-
-                    // --- Brevo Email Sending Logic ---
-                    $config = Brevo\Client\Configuration::getDefaultConfiguration()->setApiKey('api-key', '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');
-                    $config = Brevo\Client\Configuration::getDefaultConfiguration()->setApiKey('partner-key', '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');
-
-                    $apiInstance = new Brevo\Client\Api\TransactionalEmailsApi(
-                        new GuzzleHttp\Client(),
-                        $config
+                    // Call the new function to send the status update email
+                    sendFormStatusUpdateEmail(
+                        $userRow['user_id'],
+                        $userRow['document_name'],
+                        $data->status,
+                        $data->admin_notes ?? ''
                     );
 
-                    $emailBody = "<h1>Request Status Update</h1>";
-                    $emailBody .= "<p>Your request with ID <strong>{$requestId}</strong> has been updated.</p>";
-                    $emailBody .= "<p><strong>New Status:</strong> " . htmlspecialchars($data->status) . "</p>";
-                    if (!empty($data->admin_notes)) {
-                        $emailBody .= "<p><strong>Admin Feedback:</strong> " . htmlspecialchars($data->admin_notes) . "</p>";
-                    }
-
-                    $sendSmtpEmail = new \Brevo\Client\Model\SendSmtpEmail([
-                         'subject' => 'Request Status Update',
-                         'sender' => ['name' => $adminName, 'email' => $adminEmail],
-                         'replyTo' => ['name' => $adminName, 'email' => $adminEmail],
-                         'to' => [[ 'name' => $userRow['full_name'], 'email' => $userRow['email']]],
-                         'htmlContent' => $emailBody
-                    ]);
-
-                    try {
-                        $result = $apiInstance->sendTransacEmail($sendSmtpEmail);
-                        error_log("Email sent successfully to: " . $userRow['email']);
-                    } catch (Exception $e) {
-                        error_log('Exception when calling TransactionalEmailsApi->sendTransacEmail: '. $e->getMessage());
-                    }
                 } else {
                     error_log("User not found for the given request ID.");
                 }
