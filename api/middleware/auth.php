@@ -48,6 +48,26 @@ function getCurrentUserId() {
     return $payload['user_id'] ?? null;
 }
 
+function getCurrentUser() {
+    $jwt = getBearerToken();
+    if (empty($jwt)) {
+        return null;
+    }
+    
+    $payload = get_jwt_payload($jwt);
+    if (!$payload || !isset($payload['user_id'])) {
+        return null;
+    }
+    
+    // Return user data from JWT payload
+    return [
+        'id' => $payload['user_id'] ?? null,
+        'email' => $payload['email'] ?? null,
+        'role' => $payload['role'] ?? null,
+        'full_name' => $payload['full_name'] ?? null
+    ];
+}
+
 function getRole() {
     $jwt = getBearerToken();
     if (empty($jwt)) {

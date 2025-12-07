@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Student Dashboard - Document Submission System</title>
+  <title>Dashboard - Document Submission System</title>
   <link rel="stylesheet" href="user.css">
   <script>
    
@@ -67,7 +67,7 @@
       <div class="item content">
         <!-- Dashboard Section -->
         <section id="dashboard" aria-labelledby="dashboard-heading">
-          <h2 id="dashboard-heading">Student Dashboard</h2>
+          <h2 id="dashboard-heading">Dashboard</h2>
           <p class="subtext">Overview of your document requests and submission status.</p>
 
           <!-- Status Cards -->
@@ -135,6 +135,12 @@
                     <option value="">Select Document Type</option>
                     <!-- Options populated by JS -->
                   </select>
+                </div>
+
+                <!-- Document Description -->
+                <div class="form-group" id="documentDescriptionGroup" style="display: none;">
+                  <label>Description:</label>
+                  <div class="document-description" id="documentDescription"></div>
                 </div>
 
                 <div class="form-group">

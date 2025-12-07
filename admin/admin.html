@@ -174,15 +174,11 @@
           <div class="table-section">
            <div class="doc-type-section">
               <h4>Manage Document Types</h4>
-              <form id="addDocTypeForm">
-                <div class="add-doc-type-wrapper">
-                  <label for="newDocTypeInput" class="sr-only">Add new document type</label>
-                  <input type="text" id="newDocTypeInput" placeholder="New document type..." required>
-                  <button type="submit" id="addDocTypeBtn" class="btn blue" aria-label="Add Document Type">
-                    <span>+ Add</span> 
-                  </button>
-                </div>
-              </form>
+              <div class="add-doc-type-wrapper">
+                <button type="button" id="addDocTypeBtn" class="btn blue" aria-label="Add Document Type">
+                  <span>+ Add New Document Type</span> 
+                </button>
+              </div>
               <label for="searchDocTypeInput" class="sr-only">Search document types</label>
               <input type="text" id="searchDocTypeInput" placeholder="Search document types...">
               <ul id="docTypeList" role="list" aria-label="Document Types List">
@@ -257,39 +253,87 @@
     </div>
   </div>
 
-  <!-- Modal for Editing Document Type -->
+  <!-- Modal for Adding/Editing Document Type -->
   <div id="docTypeModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="docTypeModal-heading">
-    <div class="modal-content">
-      <h3 id="docTypeModal-heading">Edit Document Type</h3>
+    <div class="modal-content modal-large">
+      <h3 id="docTypeModal-heading">Add New Document Type</h3>
       <div id="docTypeModalContent" class="modal-body">
-        <div class="form-group">
-          <label for="editDocTypeName">Document Type Name</label>
-          <input type="text" id="editDocTypeName" placeholder="Enter document type name">
-        </div>
         
-        <div class="form-group">
-          <label>Document Template</label>
+        <!-- Basic Information -->
+        <div class="form-section">
+          <h4>Basic Information</h4>
+          <div class="form-group">
+            <label for="editDocTypeName">Document Type Name *</label>
+            <input type="text" id="editDocTypeName" placeholder="e.g., Certificate of Enrollment">
+          </div>
+          
+          <div class="form-group">
+            <label for="editDocTypeCode">Type Code *</label>
+            <input type="text" id="editDocTypeCode" placeholder="e.g., coe (auto-generated from name)">
+            <small>Unique identifier for this document type</small>
+          </div>
+          
+          <div class="form-group">
+            <label for="editDocTypeCategory">Category *</label>
+            <select id="editDocTypeCategory">
+              <option value="request">Request Form (REQ-YYYYMMDD-XXXXX)</option>
+              <option value="application">Application Form (APP-YYYYMMDD-XXXXX)</option>
+            </select>
+            <small>Determines the ID prefix for submissions</small>
+          </div>
+          
+          <div class="form-group">
+            <label for="editDocTypeDescription">Description</label>
+            <textarea id="editDocTypeDescription" placeholder="Brief description of this document type..." rows="3"></textarea>
+          </div>
+        </div>
+
+        <!-- Template Upload -->
+        <div class="form-section">
+          <h4>Document Template</h4>
           <div class="current-template" id="currentTemplateContainer">
             <!-- Current template info will be displayed here -->
           </div>
-          <label for="templateFileInput">Upload New Template</label>
-          <div id="fileUploadArea" class="file-upload-area">
+          <div class="form-group">
+            <label for="templateFileInput">Upload Template File</label>
             <input type="file" id="templateFileInput" class="file-input-simple" accept=".pdf,.docx">
-      </div>
-       <div class="form-group">
-          <label>Manage Requirements</label>
+            <small>Supported formats: PDF, DOCX (Max: 10MB)</small>
+          </div>
+        </div>
+
+        <!-- Custom Form Fields -->
+        <div class="form-section" id="formFieldsSection">
+          <h4>Custom Form Fields</h4>
+          <p class="section-description">Define the fields that users need to fill out for this document type.</p>
+          <div id="formFieldsContainer">
+            <!-- Form fields will be added here dynamically -->
+          </div>
+          <button type="button" id="addFormFieldBtn" class="btn green small">+ Add Form Field</button>
+        </div>
+
+        <!-- File Upload Requirements -->
+        <div class="form-section" id="requirementsSection">
+          <h4>File Upload Requirements</h4>
+          <p class="section-description">Specify files that users need to upload (e.g., ID photo, supporting documents).</p>
           <div id="requirementsContainer">
             <!-- Requirements will be loaded here -->
           </div>
           <div class="add-requirement-wrapper">
-            <label for="newRequirementInput" class="sr-only">Add new requirement</label>
-            <input type="text" id="newRequirementInput" class="new-requirement-input" placeholder="New requirement name...">
-            <button type="button" id="addRequirementBtn" class="btn green">Add</button>
+            <input type="text" id="newRequirementInput" class="new-requirement-input" placeholder="Requirement name (e.g., 2x2 ID Photo)...">
+            <select id="requirementFileType" class="requirement-file-type">
+              <option value="image">Image (JPG, PNG)</option>
+              <option value="pdf">PDF Only</option>
+              <option value="docx">Word Document</option>
+              <option value="any">Any File Type</option>
+            </select>
+            <button type="button" id="addRequirementBtn" class="btn green small">+ Add</button>
           </div>
         </div>
+
+      </div>
       <div class="modal-actions">
         <button id="closeDocTypeModal" class="btn gray">Cancel</button>
-        <button id="saveDocTypeBtn" class="btn blue">Save Changes</button>
+        <button id="saveDocTypeBtn" class="btn blue">Save Document Type</button>
       </div>
     </div>
   </div>

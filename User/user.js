@@ -90,6 +90,9 @@ function setupEventListeners() {
     // Document type changes
     document.getElementById('requestDocType').addEventListener('change', updateTemplatePreview);
     document.getElementById('applyDocType').addEventListener('change', updateApplyForm);
+    
+    // Initialize apply form on page load
+    updateApplyForm();
 
     // Event delegation for requirement uploads
     document.getElementById('uploadRequirementsList').addEventListener('click', handleRequirementUploadClick);
@@ -149,7 +152,8 @@ const apiService = {
     },
 
     async getDocumentTypes() {
-        return await this.makeRequest('/documents/types.php');
+        // Use manage.php to get document types with form fields
+        return await this.makeRequest('/documents/manage.php');
     },
 
     async getTemplatePreview(docTypeCode) {
@@ -167,10 +171,19 @@ const apiService = {
         const formData = new FormData();
         formData.append('request_id', requestId);
 
-        // Append each file to the form data
-        Object.values(filesObject).forEach(file => {
-            formData.append('files[]', file);
+        // Append each file to the form data with requirement name
+        Object.entries(filesObject).forEach(([uniqueKey, fileData]) => {
+            formData.append('files[]', fileData.file);
+            formData.append('requirement_names[]', fileData.requirementName);
         });
+        
+        console.log('Uploading files for request:', requestId);
+        console.log('Files count:', Object.keys(filesObject).length);
+        console.log('File details:', Object.entries(filesObject).map(([key, data]) => ({
+            key: key,
+            requirementName: data.requirementName,
+            fileName: data.file.name
+        })));
 
         const userDataString = localStorage.getItem('userData') || sessionStorage.getItem('userData');
         const userData = userDataString ? JSON.parse(userDataString) : null;
@@ -338,16 +351,29 @@ function renderRequestsTable(statusFilter = '') {
 async function updateTemplatePreview() {
     const docTypeCode = document.getElementById('requestDocType').value;
     const previewContainer = document.getElementById('templatePreviewContainer');
+    const descriptionContainer = document.getElementById('documentDescription');
+    const descriptionGroup = document.getElementById('documentDescriptionGroup');
 
     if (!docTypeCode) {
         previewContainer.innerHTML = '<div class="template-preview-content"><p class="preview-placeholder">Select a document type to see the template preview.</p></div>';
+        descriptionGroup.style.display = 'none';
         return;
     }
 
     const docType = documentTypes.find(doc => doc.type_code === docTypeCode);
 
+    // Display description if available
+    if (docType && docType.description) {
+        descriptionContainer.innerHTML = `<p>${docType.description}</p>`;
+        descriptionGroup.style.display = 'block';
+    } else {
+        descriptionGroup.style.display = 'none';
+    }
+
     if (docType && docType.template_path) {
-        const templateUrl = `/student_affairs${docType.template_path}`;
+        // Ensure proper path separator - add slash if template_path doesn't start with one
+        const separator = docType.template_path.startsWith('/') ? '' : '/';
+        const templateUrl = `/student_affairs${separator}${docType.template_path}`;
         const isPdf = docType.template_path.toLowerCase().endsWith('.pdf');
 
         if (isPdf) {
@@ -379,54 +405,118 @@ function updateApplyForm() {
     const requirementsList = document.getElementById('uploadRequirementsList');
     
     if (!docTypeCode) {
-        formFields.innerHTML = '';
+        formFields.innerHTML = '<p style="color: #6c757d; text-align: center; padding: 20px;">Select a document type to see the required fields</p>';
         requirementsList.innerHTML = '';
         return;
     }
 
     const docType = documentTypes.find(doc => doc.type_code === docTypeCode);
     
-    // Update form fields
-    formFields.innerHTML = `
-        <div class="form-group">
-            <label for="applicantName">Full Name</label>
-            <input type="text" id="applicantName" value="${currentStudent.full_name}" required>
-        </div>
-        <div class="form-group">
-            <label for="applicantId">Student ID</label>
-            <input type="text" id="applicantId" value="${currentStudent.student_id}" required>
-        </div>
-        <div class="form-group">
-            <label for="applicantCourse">Course/Program</label>
-            <input type="text" id="applicantCourse" value="${currentStudent.course}" required>
-        </div>
-        <div class="form-group">
-            <label for="applyPurpose">Purpose of Request</label>
-            <textarea id="applyPurpose" placeholder="Please specify the purpose for this application..." required></textarea>
-        </div>
-    `;
+    if (!docType) {
+        formFields.innerHTML = '<p style="color: #dc3545;">Document type not found.</p>';
+        requirementsList.innerHTML = '';
+        return;
+    }
+
+    // Build dynamic form fields based on admin configuration
+    let formHTML = '';
+    
+    // Check if document type has custom form fields (from manage.php API)
+    if (docType.form_fields && docType.form_fields.length > 0) {
+        // This is an APPLICATION form with custom fields
+        formHTML += '<h4 style="margin-bottom: 15px; color: #2c3e50;">📝 Application Information</h4>';
+        formHTML += '<h2 style="margin-bottom: 15px; color: #2c3e50;" font-weight: 300;>Form Submission Guidelines & Required Information</h2>';
+        formHTML += '<p style="margin-bottom: 15px; color: #2c3e50;">To complete and submit your application/form successfully, please prepare and provide the exact documents and details listed below. Incomplete submissions will be rejected automatically.</p>';
+        // Always add purpose field first for applications
+        formHTML += `
+            <div class="form-group">
+                <label for="applicationPurpose">Purpose of Application <span style="color: red;">*</span></label>
+                <textarea id="applicationPurpose" placeholder="Please explain your reason for applying..." required rows="3"></textarea>
+            </div>
+        `;
+        
+        docType.form_fields.forEach((field, index) => {
+            const fieldId = `custom_field_${index}`;
+            const requiredAttr = field.is_required ? 'required' : '';
+            const requiredLabel = field.is_required ? '<span style="color: red;">*</span>' : '';
+            
+            formHTML += `<div class="form-group">`;
+            formHTML += `<label for="${fieldId}">${field.field_name} ${requiredLabel}</label>`;
+            
+            switch (field.field_type) {
+                case 'text':
+                    formHTML += `<input type="text" id="${fieldId}" name="${field.field_name}" placeholder="Enter ${field.field_name}" ${requiredAttr}>`;
+                    break;
+                case 'number':
+                    formHTML += `<input type="number" id="${fieldId}" name="${field.field_name}" placeholder="Enter ${field.field_name}" ${requiredAttr}>`;
+                    break;
+                case 'email':
+                    formHTML += `<input type="email" id="${fieldId}" name="${field.field_name}" placeholder="Enter ${field.field_name}" ${requiredAttr}>`;
+                    break;
+                case 'date':
+                    formHTML += `<input type="date" id="${fieldId}" name="${field.field_name}" ${requiredAttr}>`;
+                    break;
+                case 'textarea':
+                    formHTML += `<textarea id="${fieldId}" name="${field.field_name}" rows="4" placeholder="Enter ${field.field_name}" ${requiredAttr}></textarea>`;
+                    break;
+                default:
+                    formHTML += `<input type="text" id="${fieldId}" name="${field.field_name}" placeholder="Enter ${field.field_name}" ${requiredAttr}>`;
+            }
+            
+            formHTML += `</div>`;
+        });
+    } else {
+        // This is a simple REQUEST form - just show purpose
+        formHTML += '<h4 style="margin-bottom: 15px; color: #2c3e50;">📝 Request Information</h4>';
+        formHTML += `
+            <div class="form-group">
+                <label for="requestPurposeApply">Purpose of Request <span style="color: red;">*</span></label>
+                <textarea id="requestPurposeApply" placeholder="Please specify the purpose for this request..." required rows="4"></textarea>
+            </div>
+        `;
+    }
+    
+    formFields.innerHTML = formHTML;
 
     // Update requirements based on document type
-    const requirements = getDocumentRequirements(docTypeCode);
-    requirementsList.innerHTML = `
-        <ul>
-            ${requirements.map(req => `
-                <li>
-                    <span>${req.requirement_name}</span>
-                    ${req.uploaded && requirementFiles[req.id] ? `
-                        <div class="requirement-status uploaded">
-                            <span class="file-name-display" title="${requirementFiles[req.id].name}">
-                                ${requirementFiles[req.id].name}
-                            </span>
-                            <button type="button" class="btn red small remove-req-btn" data-req-id="${req.id}">Remove</button>
+    const requirements = docType.requirements || [];
+    
+    if (requirements.length > 0) {
+        requirementsList.innerHTML = `
+            <h4 style="margin-bottom: 15px; color: #2c3e50;">📤 Required File Uploads</h4>
+            <div class="requirements-container">
+                ${requirements.map((req, index) => {
+                    const reqId = `requirement_${index}`;
+                    const fileTypeLabel = getFileTypeLabel(req.file_type || 'any');
+                    const acceptTypes = getAcceptTypes(req.file_type || 'any');
+                    
+                    return `
+                        <div class="requirement-item" data-requirement-index="${index}">
+                            <div class="requirement-info">
+                                <label for="${reqId}">
+                                    ${req.requirement_name || req.name}
+                                    <span style="color: red;">*</span>
+                                </label>
+                                <small style="color: #6c757d;">${fileTypeLabel}</small>
+                            </div>
+                            <div class="requirement-upload">
+                                <input type="file" 
+                                       id="${reqId}" 
+                                       name="${req.requirement_name || req.name}"
+                                       accept="${acceptTypes}"
+                                       required
+                                       onchange="handleRequirementFileChange(this, ${index})"
+                                       style="margin-bottom: 5px;">
+                                <span class="file-status" id="status_${index}" style="font-size: 0.9em;">No file chosen</span>
+                            </div>
                         </div>
-                    ` : `
-                        <button type="button" class="btn blue small upload-req-btn" data-req-id="${req.id}">Upload</button>
-                    `}
-                </li>
-            `).join('')}
-        </ul>
-    `;
+                    `;
+                }).join('')}
+            </div>
+        `;
+    } else {
+        requirementsList.innerHTML = '<p style="color: #6c757d; font-style: italic;">No file uploads required for this document type.</p>';
+    }
 }
 
 function handleRequirementUploadClick(event) {
@@ -544,14 +634,59 @@ async function handleApplyDocument(event) {
     event.preventDefault();
     
     const docTypeCode = document.getElementById('applyDocType').value;
-    const purpose = document.getElementById('applyPurpose')?.value;
-
-    if (!docTypeCode || !purpose) {
-        alert('Please fill in all required fields.');
+    
+    if (!docTypeCode) {
+        alert('Please select a document type.');
         return;
     }
-
+    
     const docType = documentTypes.find(doc => doc.type_code === docTypeCode);
+    
+    // Determine if this is a simple request or application with custom fields
+    let purpose = '';
+    
+    if (docType.form_fields && docType.form_fields.length > 0) {
+        // This is an APPLICATION form with custom fields
+        
+        // Get the purpose from the application purpose field
+        const purposeField = document.getElementById('applicationPurpose');
+        purpose = purposeField ? purposeField.value.trim() : '';
+        
+        if (!purpose) {
+            alert('Please fill in the purpose field.');
+            return;
+        }
+        
+        // Collect all custom field values
+        const formData = {};
+        let allFieldsFilled = true;
+        
+        docType.form_fields.forEach((field, index) => {
+            const fieldElement = document.getElementById(`custom_field_${index}`);
+            if (fieldElement) {
+                const value = fieldElement.value.trim();
+                if (field.is_required && !value) {
+                    allFieldsFilled = false;
+                }
+                formData[field.field_name] = value;
+            }
+        });
+        
+        if (!allFieldsFilled) {
+            alert('Please fill in all required fields.');
+            return;
+        }
+            
+    } else {
+        // This is a simple REQUEST form - get purpose field
+        const purposeField = document.getElementById('requestPurposeApply');
+        purpose = purposeField ? purposeField.value.trim() : '';
+        
+        if (!purpose) {
+            alert('Please fill in the purpose field.');
+            return;
+        }
+    }
     
     showConfirmModal(`
         <p><strong>Document Type:</strong> ${docType?.name}</p>
@@ -570,12 +705,38 @@ async function handleApplyDocument(event) {
             if (requestResult.success) {
                 const newRequestId = requestResult.id; // Use the new integer ID
 
-                // Step 2: If files were selected, upload them
-                if (Object.keys(requirementFiles).length > 0) {
-                    const uploadResult = await apiService.uploadRequirementFiles(newRequestId, requirementFiles);
-                    if (!uploadResult.success) {
-                        // Notify user but don't block success message for the request itself
-                        alert(`⚠️ Application submitted, but file upload failed: ${uploadResult.message}`);
+                // Step 2: Upload files if any were selected
+                const fileCount = Object.keys(requirementFiles).length;
+                if (fileCount > 0) {
+                    console.log(`Uploading ${fileCount} files...`);
+                    try {
+                        const uploadResult = await apiService.uploadRequirementFiles(newRequestId, requirementFiles);
+                        if (!uploadResult.success) {
+                            console.error('File upload failed:', uploadResult.message);
+                            alert(`⚠️ Application submitted, but file upload failed: ${uploadResult.message}`);
+                        } else {
+                            console.log('Files uploaded successfully');
+                        }
+                    } catch (uploadError) {
+                        console.error('File upload error:', uploadError);
+                        alert(`⚠️ Application submitted, but file upload encountered an error.`);
+                    }
+                } else {
+                    console.log('No files to upload');
+                }
+                
+                // Step 3: Save form field data to application_form_data table
+                if (docType.form_fields && docType.form_fields.length > 0) {
+                    console.log('Saving form field data...', {
+                        requestId: newRequestId,
+                        fieldCount: docType.form_fields.length
+                    });
+                    try {
+                        const saveResult = await saveApplicationFormData(newRequestId, docType.form_fields);
+                        console.log('Form data save result:', saveResult);
+                    } catch (formDataError) {
+                        console.error('Failed to save form data:', formDataError);
+                        alert('⚠️ Application submitted, but custom field data was not saved. Error: ' + formDataError.message);
                     }
                 }
                 
@@ -703,11 +864,133 @@ function resetNewRequestForm() {
         '<div class="template-preview-content"><p class="preview-placeholder">Select a document type to see the template preview.</p></div>';
 }
 
+// Helper functions for file type handling
+function getFileTypeLabel(fileType) {
+    const labels = {
+        'image': 'Accepted: JPG, PNG (Max 5MB)',
+        'pdf': 'Accepted: PDF only (Max 10MB)',
+        'docx': 'Accepted: Word Document (Max 10MB)',
+        'any': 'Accepted: Any file type (Max 10MB)'
+    };
+    return labels[fileType] || labels['any'];
+}
+
+function getAcceptTypes(fileType) {
+    const types = {
+        'image': 'image/jpeg,image/png,image/jpg',
+        'pdf': 'application/pdf',
+        'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document,.doc,.docx',
+        'any': '*'
+    };
+    return types[fileType] || '*';
+}
+
+// Handle requirement file change
+function handleRequirementFileChange(input, index) {
+    const statusSpan = document.getElementById(`status_${index}`);
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        
+        // Validate file size (10MB max)
+        if (file.size > 10 * 1024 * 1024) {
+            alert(`File ${file.name} is too large. Maximum size is 10MB.`);
+            input.value = '';
+            statusSpan.textContent = 'No file chosen';
+            statusSpan.style.color = '#6c757d';
+            return;
+        }
+        
+        // Store the file in requirementFiles object with unique key (requirement name + index)
+        const reqName = input.name;
+        const uniqueKey = `${reqName}_${index}`;
+        
+        // Store both the file and the original requirement name
+        requirementFiles[uniqueKey] = {
+            file: file,
+            requirementName: reqName
+        };
+        
+        const fileSize = (file.size / 1024 / 1024).toFixed(2); // MB
+        statusSpan.textContent = `✓ ${file.name} (${fileSize} MB)`;
+        statusSpan.style.color = '#28a745';
+        
+        console.log(`File stored for requirement: ${reqName} (index: ${index})`, file.name);
+    } else {
+        statusSpan.textContent = 'No file chosen';
+        statusSpan.style.color = '#6c757d';
+    }
+}
+
 function resetApplyForm() {
     document.getElementById('applyDocumentForm').reset();
     requirementFiles = {}; // Clear stored files
-    document.getElementById('applicationFormFields').innerHTML = '';
+    document.getElementById('applicationFormFields').innerHTML = '<p style="color: #6c757d; text-align: center; padding: 20px;">Select a document type to see the required fields</p>';
     document.getElementById('uploadRequirementsList').innerHTML = '';
+}
+
+// Save application form data
+async function saveApplicationFormData(requestId, formFields) {
+    const formData = {};
+    
+    formFields.forEach((field, index) => {
+        const fieldElement = document.getElementById(`custom_field_${index}`);
+        if (fieldElement) {
+            formData[field.field_name] = fieldElement.value;
+        }
+    });
+    
+    console.log('Preparing to save form data:', {
+        requestId,
+        formData,
+        fieldCount: Object.keys(formData).length
+    });
+    
+    // Send to API to save in application_form_data table
+    try {
+        const userDataString = localStorage.getItem('userData') || sessionStorage.getItem('userData');
+        const userData = userDataString ? JSON.parse(userDataString) : null;
+        const token = userData ? userData.token : null;
+        
+        if (!token) {
+            throw new Error('No authentication token found');
+        }
+        
+        console.log('Sending request to save_form_data.php...');
+        
+        const response = await fetch(`${API_BASE}/request/save_form_data.php`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                request_id: requestId,
+                form_data: formData
+            })
+        });
+        
+        console.log('API Response status:', response.status);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('API Error response:', errorText);
+            throw new Error(`API returned ${response.status}: ${errorText}`);
+        }
+        
+        const result = await response.json();
+        console.log('API Response:', result);
+        
+        if (result.success) {
+            console.log('✅ Form data saved successfully to application_form_data table');
+            return result;
+        } else {
+            console.error('❌ Failed to save form data:', result.message);
+            throw new Error(result.message);
+        }
+    } catch (error) {
+        console.error('❌ Error saving form data:', error);
+        throw error; // Re-throw so calling function can handle it
+    }
 }
 
 // Logout
@@ -734,6 +1017,53 @@ style.textContent = `
         font-size: 0.9em; color: #333;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;
         background: #f1f3f5; padding: 4px 8px; border-radius: 4px;
+    }
+    
+    /* Dynamic form field styles */
+    .requirements-container {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        margin-top: 10px;
+    }
+    
+    .requirement-item {
+        padding: 15px;
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+    }
+    
+    .requirement-info label {
+        font-weight: 600;
+        color: #2c3e50;
+        display: block;
+        margin-bottom: 5px;
+    }
+    
+    .requirement-info small {
+        display: block;
+        margin-bottom: 10px;
+    }
+    
+    .requirement-upload {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .file-status {
+        padding: 5px 0;
+        color: #6c757d;
+    }
+    
+    #applicationFormFields h4,
+    #uploadRequirementsList h4 {
+        font-size: 1.1em;
+        font-weight: 600;
+        color: #2c3e50;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #e9ecef;
     }
 `;
 document.head.appendChild(style);

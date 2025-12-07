@@ -35,22 +35,31 @@ try {
     }
 
     $uploaded_files = [];
+    $requirement_names = isset($_POST['requirement_names']) ? $_POST['requirement_names'] : [];
 
     foreach ($_FILES['files']['tmp_name'] as $key => $tmp_name) {
         $file_name = $_FILES['files']['name'][$key];
         $file_size = $_FILES['files']['size'][$key];
         $file_type = $_FILES['files']['type'][$key];
         $file_error = $_FILES['files']['error'][$key];
+        $requirement_name = isset($requirement_names[$key]) ? $requirement_names[$key] : 'General Upload';
 
         if ($file_error !== UPLOAD_ERR_OK) {
             throw new Exception("File upload error: " . $file_error);
         }
 
-        if ($file_size > 5 * 1024 * 1024) {
-            throw new Exception("File too large: " . $file_name);
+        if ($file_size > 10 * 1024 * 1024) { // Increased to 10MB
+            throw new Exception("File too large: " . $file_name . " (Max: 10MB)");
         }
 
-        $allowed_types = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+        $allowed_types = [
+            'application/pdf', 
+            'image/jpeg', 
+            'image/png', 
+            'image/jpg',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+            'application/msword' // .doc
+        ];
         if (!in_array($file_type, $allowed_types)) {
             throw new Exception("Invalid file type: " . $file_name);
         }
@@ -60,16 +69,21 @@ try {
         $file_path = $upload_dir . $unique_filename;
 
         if (move_uploaded_file($tmp_name, $file_path)) {
-            $query = "INSERT INTO uploaded_files (request_id, file_name, file_path, file_size, mime_type) VALUES (:request_id, :file_name, :file_path, :file_size, :mime_type)";
+            $query = "INSERT INTO uploaded_files (request_id, requirement_name, file_name, file_path, file_size, mime_type, created_at) 
+                     VALUES (:request_id, :requirement_name, :file_name, :file_path, :file_size, :mime_type, NOW())";
             $stmt = $db->prepare($query);
             $stmt->bindParam(":request_id", $request_id);
+            $stmt->bindParam(":requirement_name", $requirement_name);
             $stmt->bindParam(":file_name", $file_name);
             $stmt->bindParam(":file_path", $file_path);
             $stmt->bindParam(":file_size", $file_size);
             $stmt->bindParam(":mime_type", $file_type);
             $stmt->execute();
 
-            $uploaded_files[] = $file_name;
+            $uploaded_files[] = [
+                'file_name' => $file_name,
+                'requirement' => $requirement_name
+            ];
         }
     }
 

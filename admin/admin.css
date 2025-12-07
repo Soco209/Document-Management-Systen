@@ -263,7 +263,6 @@ body {
    BUTTON STYLES (HARDCODED)
    ====================== */
 .btn {
-  display: inline-flex;
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
@@ -275,10 +274,15 @@ body {
   transition: all 0.3s ease;
   text-decoration: none;
 }
+a.btn.blue.small {
+    width: 20%;
+    text-align: center;
+}
 
 .btn.blue {
-  background-color: #0d6efd;
+  background-color: #0f47ef;
   color: white;
+  width: 100%;
 }
 
 .btn.blue:hover {
@@ -308,6 +312,12 @@ body {
   background-color: #5c636a;
 }
 
+.btn.red.toggle-user{
+  width: 100%;
+}
+button.btn.green.toggle-user {
+    width: 100%;
+}
 .btn.red {
   background-color: #dc3545;
   color: white;
@@ -338,6 +348,9 @@ body {
 .btn.small {
   padding: 0.25rem 0.5rem;
   font-size: 0.75rem;
+}
+button#addFormFieldBtn {
+    width: 100%;
 }
 
 /* ======================
@@ -445,7 +458,7 @@ table {
 
 th,
 td {
-  padding: 1rem 1.5rem;
+  padding: 2%;
   text-align: left;
   border-bottom: 1px solid #dee2e6;
 }
@@ -541,7 +554,7 @@ tbody tr:hover {
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
   font-size: 0.75rem;
-  font-weight: 500;
+  font-weight: 500
 }
 
 .role-admin {
@@ -854,4 +867,284 @@ tbody tr:hover {
 
 .user-documents-section a:hover {
   text-decoration: underline;
+}
+
+/* ======================
+   DOCUMENT TYPE MODAL STYLES
+   ====================== */
+.modal-large {
+    max-width: 800px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.form-section {
+    margin-bottom: 30px;
+    padding: 20px;
+    background: #f9f9f9;
+    border-radius: 8px;
+}
+
+.form-section h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #2c3e50;
+    font-size: 1.1em;
+}
+
+.section-description {
+    color: #7f8c8d;
+    font-size: 0.9em;
+    margin-bottom: 15px;
+}
+
+.form-group small {
+    display: block;
+    color: #7f8c8d;
+    font-size: 0.85em;
+    margin-top: 5px;
+}
+
+.form-group textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: inherit;
+    resize: vertical;
+}
+
+/* Form Fields Section */
+#formFieldsContainer {
+    margin-bottom: 15px;
+}
+
+.form-field-item {
+    margin-bottom: 10px;
+}
+
+.form-field-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 12px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+}
+
+.field-name-input {
+    flex: 2;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.field-type-select {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+}
+
+.field-required-label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.field-required-checkbox {
+    cursor: pointer;
+}
+
+/* Requirements Section */
+.requirements-list {
+    list-style: none;
+    padding: 0;
+    margin-bottom: 15px;
+}
+
+.requirements-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-bottom: 8px;
+}
+
+.requirement-name {
+    font-weight: 500;
+    flex: 1;
+}
+
+.requirement-type {
+    color: #7f8c8d;
+    font-size: 0.9em;
+    margin-right: 10px;
+}
+
+.add-requirement-wrapper {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.new-requirement-input {
+    flex: 2;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.requirement-file-type {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+}
+
+.no-requirements,
+.no-template {
+    color: #7f8c8d;
+    font-style: italic;
+    padding: 15px;
+    text-align: center;
+    background: white;
+    border: 1px dashed #ddd;
+    border-radius: 4px;
+}
+
+.current-template {
+    margin-bottom: 15px;
+}
+
+.template-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+}
+
+.template-name {
+    font-weight: 500;
+    color: #2c3e50;
+}
+
+.template-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* ======================
+   Form Data & Documents Display
+   ====================== */
+
+/* Form Data Section Styles */
+.form-data-section {
+    margin-bottom: 25px;
+}
+
+.form-data-section h4 {
+    color: #2c3e50;
+    font-size: 1.1em;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.form-data-container {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 15px;
+}
+
+.form-data-row {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 15px;
+    padding: 12px 0;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.form-data-row:last-child {
+    border-bottom: none;
+}
+
+.form-data-label {
+    font-weight: 600;
+    color: #495057;
+}
+
+.form-data-value {
+    color: #212529;
+    word-wrap: break-word;
+}
+
+/* Uploaded Files Section Styles */
+.uploaded-files-section {
+    margin-bottom: 25px;
+}
+
+.uploaded-files-section h4 {
+    color: #2c3e50;
+    font-size: 1.1em;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.documents-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* Document row styles */
+.document-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+    transition: all 0.2s ease;
+}
+
+.document-row:hover {
+    background-color: #e9ecef;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.document-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+.file-icon {
+    font-size: 2em;
+    line-height: 1;
+}
+
+.document-name {
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 4px;
+}
+
+.document-filename {
+    font-size: 0.85em;
+    color: #6c757d;
 }

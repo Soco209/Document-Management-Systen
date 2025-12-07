@@ -5,25 +5,25 @@ header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
 header("Access-Control-Allow-Credentials: true");
 
-session_start();
+// Handle preflight OPTIONS request
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
+
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../middleware/auth.php';
 
-// Check authentication
-if (!function_exists('isAuthenticated')) {
-    function isAuthenticated() {
-        return isset($_SESSION['user_id']) && !empty($_SESSION['user_id']);
-    }
-}
-
+// Check authentication using JWT
 if (!isAuthenticated()) {
     http_response_code(401);
     echo json_encode(["success" => false, "message" => "Authentication required"]);
     exit();
 }
 
-// Check if user is admin
-if ($_SESSION['user_role'] !== 'admin') {
+// Check if user is admin (except for GET requests which students need)
+$method = $_SERVER['REQUEST_METHOD'];
+if ($method !== 'GET' && !isAdmin()) {
     http_response_code(403);
     echo json_encode(["success" => false, "message" => "Admin access required"]);
     exit();
@@ -31,7 +31,6 @@ if ($_SESSION['user_role'] !== 'admin') {
 
 $database = new Database();
 $db = $database->getConnection();
-$method = $_SERVER['REQUEST_METHOD'];
 
 try {
     switch ($method) {
@@ -59,39 +58,64 @@ try {
 
 function handleGetDocumentTypes($db) {
     try {
-        $query = "SELECT dt.*, GROUP_CONCAT(CONCAT(df.field_name, ':', df.field_type, ':', df.is_required) SEPARATOR '|') as form_fields 
-                  FROM document_types dt 
-                  LEFT JOIN document_form_fields df ON dt.id = df.document_type_id 
-                  GROUP BY dt.id 
-                  ORDER BY dt.created_at DESC";
+        // Get document types
+        $query = "SELECT * FROM document_types ORDER BY created_at DESC";
         $stmt = $db->prepare($query);
         $stmt->execute();
         
         $documentTypes = [];
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            // Get form fields for this document type with field IDs
+            $formFieldsQuery = "SELECT id, field_name, field_type, is_required, field_order 
+                               FROM document_form_fields 
+                               WHERE document_type_id = :doc_type_id 
+                               ORDER BY field_order";
+            $formFieldsStmt = $db->prepare($formFieldsQuery);
+            $formFieldsStmt->bindParam(':doc_type_id', $row['id']);
+            $formFieldsStmt->execute();
+            
             $formFields = [];
-            if (!empty($row['form_fields'])) {
-                $fields = explode('|', $row['form_fields']);
-                foreach ($fields as $field) {
-                    $parts = explode(':', $field);
-                    if (count($parts) === 3) {
-                        $formFields[] = [
-                            'field_name' => $parts[0],
-                            'field_type' => $parts[1],
-                            'is_required' => (bool)$parts[2]
-                        ];
-                    }
-                }
+            while ($fieldRow = $formFieldsStmt->fetch(PDO::FETCH_ASSOC)) {
+                $formFields[] = [
+                    'id' => $fieldRow['id'],
+                    'field_name' => $fieldRow['field_name'],
+                    'field_type' => $fieldRow['field_type'],
+                    'is_required' => (bool)$fieldRow['is_required'],
+                    'field_order' => $fieldRow['field_order']
+                ];
+            }
+            
+            // Get requirements for this document type
+            $reqQuery = "SELECT id, requirement_name, requirement_description, file_type, is_mandatory 
+                        FROM required_documents 
+                        WHERE document_type_id = :doc_type_id 
+                        ORDER BY id";
+            $reqStmt = $db->prepare($reqQuery);
+            $reqStmt->bindParam(':doc_type_id', $row['id']);
+            $reqStmt->execute();
+            
+            $requirements = [];
+            while ($reqRow = $reqStmt->fetch(PDO::FETCH_ASSOC)) {
+                $requirements[] = [
+                    'id' => $reqRow['id'],
+                    'requirement_name' => $reqRow['requirement_name'],
+                    'name' => $reqRow['requirement_name'], // alias for compatibility
+                    'requirement_description' => $reqRow['requirement_description'],
+                    'file_type' => $reqRow['file_type'],
+                    'is_mandatory' => (bool)$reqRow['is_mandatory']
+                ];
             }
             
             $documentTypes[] = [
                 'id' => $row['id'],
                 'name' => $row['name'],
                 'type_code' => $row['type_code'],
+                'description' => $row['description'],
                 'category' => $row['category'],
                 'template_path' => $row['template_path'],
                 'created_at' => $row['created_at'],
-                'form_fields' => $formFields
+                'form_fields' => $formFields,
+                'requirements' => $requirements
             ];
         }
         
@@ -106,12 +130,31 @@ function handleGetDocumentTypes($db) {
 
 function handleCreateDocumentType($db) {
     try {
-        $input = json_decode(file_get_contents('php://input'), true);
+        // Check if this is a special action (add/delete form field)
+        $rawInput = file_get_contents('php://input');
+        $jsonInput = json_decode($rawInput, true);
         
-        $name = $input['name'] ?? '';
-        $typeCode = $input['type_code'] ?? '';
-        $category = $input['category'] ?? 'template';
-        $formFields = $input['form_fields'] ?? [];
+        if (isset($jsonInput['action']) && $jsonInput['action'] === 'add_form_field') {
+            handleAddFormField($db, $jsonInput);
+            return;
+        }
+        
+        // Check if this is multipart form data (has file upload)
+        if (!empty($_FILES['template'])) {
+            $name = $_POST['name'] ?? '';
+            $typeCode = $_POST['type_code'] ?? '';
+            $category = $_POST['category'] ?? 'template';
+            $description = $_POST['description'] ?? '';
+            $formFieldsJson = $_POST['form_fields'] ?? '[]';
+            $formFields = json_decode($formFieldsJson, true) ?? [];
+        } else {
+            $input = $jsonInput ?? [];
+            $name = $input['name'] ?? '';
+            $typeCode = $input['type_code'] ?? '';
+            $category = $input['category'] ?? 'template';
+            $description = $input['description'] ?? '';
+            $formFields = $input['form_fields'] ?? [];
+        }
         
         // Validate inputs
         if (empty($name) || empty($typeCode)) {
@@ -128,15 +171,35 @@ function handleCreateDocumentType($db) {
             throw new Exception("Type code already exists");
         }
         
+        // Handle file upload if present
+        $templatePath = null;
+        if (isset($_FILES['template']) && $_FILES['template']['error'] === UPLOAD_ERR_OK) {
+            $file = $_FILES['template'];
+            $uploadDir = __DIR__ . '/../../uploads/templates/';
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0777, true);
+            }
+            $fileName = uniqid() . '_' . basename($file['name']);
+            $uploadFile = $uploadDir . $fileName;
+            
+            if (move_uploaded_file($file['tmp_name'], $uploadFile)) {
+                $templatePath = 'uploads/templates/' . $fileName;
+            } else {
+                throw new Exception("Failed to upload template file");
+            }
+        }
+        
         // Begin transaction
         $db->beginTransaction();
         
         // Insert document type
-        $query = "INSERT INTO document_types (name, type_code, category, created_at) VALUES (:name, :type_code, :category, NOW())";
+        $query = "INSERT INTO document_types (name, type_code, category, description, template_path, created_at) VALUES (:name, :type_code, :category, :description, :template_path, NOW())";
         $stmt = $db->prepare($query);
         $stmt->bindParam(':name', $name);
         $stmt->bindParam(':type_code', $typeCode);
         $stmt->bindParam(':category', $category);
+        $stmt->bindParam(':description', $description);
+        $stmt->bindParam(':template_path', $templatePath);
         
         if (!$stmt->execute()) {
             throw new Exception("Failed to create document type");
@@ -153,7 +216,8 @@ function handleCreateDocumentType($db) {
                 $fieldStmt->bindParam(':doc_type_id', $documentTypeId);
                 $fieldStmt->bindParam(':field_name', $field['field_name']);
                 $fieldStmt->bindParam(':field_type', $field['field_type']);
-                $fieldStmt->bindParam(':is_required', $field['is_required']);
+                $isRequired = isset($field['is_required']) ? (int)$field['is_required'] : 0;
+                $fieldStmt->bindParam(':is_required', $isRequired);
                 $fieldStmt->bindParam(':field_order', $index);
                 
                 if (!$fieldStmt->execute()) {
@@ -171,7 +235,9 @@ function handleCreateDocumentType($db) {
             "document_type_id" => $documentTypeId
         ]);
     } catch (Exception $e) {
-        $db->rollBack();
+        if ($db->inTransaction()) {
+            $db->rollBack();
+        }
         http_response_code(400);
         echo json_encode(["success" => false, "message" => $e->getMessage()]);
     }
@@ -265,8 +331,84 @@ function handleUpdateDocumentType($db) {
     }
 }
 
+function handleAddFormField($db, $input) {
+    try {
+        $docTypeId = $input['document_type_id'] ?? null;
+        $fieldName = $input['field_name'] ?? null;
+        $fieldType = $input['field_type'] ?? 'text';
+        $isRequired = $input['is_required'] ?? 0;
+        
+        if (!$docTypeId || !$fieldName) {
+            throw new Exception('Document type ID and field name are required');
+        }
+        
+        // Get the next field order
+        $orderQuery = "SELECT MAX(field_order) as max_order FROM document_form_fields WHERE document_type_id = :doc_type_id";
+        $orderStmt = $db->prepare($orderQuery);
+        $orderStmt->bindParam(':doc_type_id', $docTypeId);
+        $orderStmt->execute();
+        $orderResult = $orderStmt->fetch(PDO::FETCH_ASSOC);
+        $nextOrder = ($orderResult['max_order'] ?? -1) + 1;
+        
+        // Insert the new form field
+        $insertQuery = "INSERT INTO document_form_fields (document_type_id, field_name, field_type, is_required, field_order, created_at) 
+                       VALUES (:doc_type_id, :field_name, :field_type, :is_required, :field_order, NOW())";
+        $insertStmt = $db->prepare($insertQuery);
+        $insertStmt->bindParam(':doc_type_id', $docTypeId);
+        $insertStmt->bindParam(':field_name', $fieldName);
+        $insertStmt->bindParam(':field_type', $fieldType);
+        $insertStmt->bindParam(':is_required', $isRequired);
+        $insertStmt->bindParam(':field_order', $nextOrder);
+        
+        if ($insertStmt->execute()) {
+            echo json_encode([
+                'success' => true,
+                'message' => 'Form field added successfully',
+                'field_id' => $db->lastInsertId()
+            ]);
+        } else {
+            throw new Exception('Failed to add form field');
+        }
+    } catch (Exception $e) {
+        http_response_code(400);
+        echo json_encode(["success" => false, "message" => $e->getMessage()]);
+    }
+}
+
+function handleDeleteFormField($db, $input) {
+    try {
+        $fieldId = $input['field_id'] ?? null;
+        
+        if (!$fieldId) {
+            throw new Exception('Field ID is required');
+        }
+        
+        $query = "DELETE FROM document_form_fields WHERE id = :id";
+        $stmt = $db->prepare($query);
+        $stmt->bindParam(':id', $fieldId);
+        
+        if ($stmt->execute()) {
+            echo json_encode(['success' => true, 'message' => 'Form field deleted successfully']);
+        } else {
+            throw new Exception('Failed to delete form field');
+        }
+    } catch (Exception $e) {
+        http_response_code(400);
+        echo json_encode(["success" => false, "message" => $e->getMessage()]);
+    }
+}
+
 function handleDeleteDocumentType($db) {
     try {
+        // Check if this is a form field deletion
+        $rawInput = file_get_contents('php://input');
+        $jsonInput = json_decode($rawInput, true);
+        
+        if (isset($jsonInput['action']) && $jsonInput['action'] === 'delete_form_field') {
+            handleDeleteFormField($db, $jsonInput);
+            return;
+        }
+        
         $id = $_GET['id'] ?? '';
         
         if (empty($id)) {

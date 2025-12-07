@@ -108,17 +108,8 @@ function setupEventListeners() {
     // Modal functionality
     setupModalEventListeners();
 
-    // Defer setup of document type management until section is visible
-    let docTypeManagementInitialized = false;
-    navLinks.forEach(link => {
-        link.addEventListener('click', function() {
-            const targetSection = this.getAttribute('data-section');
-            if (targetSection === 'users' && !docTypeManagementInitialized) {
-                setupDocumentTypeManagement();
-                docTypeManagementInitialized = true;
-            }
-        });
-    });
+    // Setup document type management immediately
+    setupDocumentTypeManagement();
 }
 
 function setupModalEventListeners() {
@@ -177,11 +168,10 @@ function setupModalEventListeners() {
 
 function setupDocumentTypeManagement() {
     // Add document type functionality
-    const addDocTypeForm = document.getElementById('addDocTypeForm');
+    const addDocTypeBtn = document.getElementById('addDocTypeBtn');
     
-    addDocTypeForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-        handleAddDocumentType();
+    addDocTypeBtn.addEventListener('click', function() {
+        openAddDocTypeModal();
     });
     
     // Search document types
@@ -204,23 +194,90 @@ function setupDocumentTypeManagement() {
     });
 }
 
-async function handleAddDocumentType() {
-    const input = document.getElementById('newDocTypeInput');
-    const name = input.value.trim();
-    if (!name) {
-        alert('Document type name cannot be empty.');
-        return;
-    }
+// Open modal for adding new document type
+function openAddDocTypeModal() {
+    currentEditingDocType = {
+        id: null,
+        name: '',
+        type_code: '',
+        category: 'request',
+        description: '',
+        template_path: null,
+        form_fields: [],
+        requirements: []
+    };
+    
+    document.getElementById('docTypeModal-heading').textContent = 'Add New Document Type';
+    document.getElementById('editDocTypeName').value = '';
+    document.getElementById('editDocTypeCode').value = '';
+    document.getElementById('editDocTypeCategory').value = 'request';
+    document.getElementById('editDocTypeDescription').value = '';
+    document.getElementById('templateFileInput').value = '';
+    
+    // Clear current template display
+    document.getElementById('currentTemplateContainer').innerHTML = '<p class="no-template">No template uploaded yet</p>';
+    
+    // Initialize form fields and requirements
+    renderFormFields([]);
+    renderRequirements([]);
+    
+    // Setup event listeners
+    setupDocTypeModalListeners();
+    
+    document.getElementById('docTypeModal').style.display = 'block';
+}
 
-    try {
-        const result = await apiService.addDocumentType(name);
-        if (result.success) {
-            alert('Document type added successfully!');
-            input.value = '';
-            await loadDocumentTypes(); // Reload the list
+// Setup event listeners for the document type modal
+function setupDocTypeModalListeners() {
+    // Auto-generate type code from name
+    const nameInput = document.getElementById('editDocTypeName');
+    const codeInput = document.getElementById('editDocTypeCode');
+    
+    nameInput.addEventListener('input', function() {
+        if (!currentEditingDocType.id) { // Only auto-generate for new types
+            const typeCode = this.value.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+            codeInput.value = typeCode;
         }
-    } catch (error) {
-        alert('Failed to add document type: ' + error.message);
+    });
+    
+    // Category change handler - show/hide sections
+    const categorySelect = document.getElementById('editDocTypeCategory');
+    categorySelect.addEventListener('change', function() {
+        toggleModalSections(this.value);
+    });
+    
+    // Initial toggle based on current category
+    toggleModalSections(categorySelect.value);
+    
+    // Add form field button
+    document.getElementById('addFormFieldBtn').onclick = function() {
+        addFormField();
+    };
+    
+    // Add requirement button
+    document.getElementById('addRequirementBtn').onclick = function() {
+        addRequirement();
+    };
+    
+    // Save button
+    document.getElementById('saveDocTypeBtn').onclick = function() {
+        handleSaveDocumentType();
+    };
+}
+
+// Toggle modal sections based on category
+function toggleModalSections(category) {
+    const formFieldsSection = document.getElementById('formFieldsSection');
+    const requirementsSection = document.getElementById('requirementsSection');
+    
+    if (category === 'request') {
+        // Request Form: Hide custom fields and requirements
+        if (formFieldsSection) formFieldsSection.style.display = 'none';
+        if (requirementsSection) requirementsSection.style.display = 'none';
+    } else if (category === 'application') {
+        // Application Form: Show all sections
+        if (formFieldsSection) formFieldsSection.style.display = 'block';
+        if (requirementsSection) requirementsSection.style.display = 'block';
     }
 }
 
@@ -275,6 +332,10 @@ const apiService = {
         return await this.makeRequest('/documents/types.php');
     },
 
+    async getDocumentTypesDetailed() {
+        return await this.makeRequest('/documents/manage.php');
+    },
+
     async updateRequestStatus(requestId, statusData) {
         return await this.makeRequest(`/request/request.php?id=${requestId}`, {
             method: 'PUT',
@@ -313,10 +374,10 @@ const apiService = {
         return await this.makeRequest(`/documents/requirements.php?doc_type_id=${docTypeId}`);
     },
 
-    async addRequirement(docTypeId, name) {
+    async addRequirement(docTypeId, name, fileType = 'any') {
         return await this.makeRequest('/documents/requirements.php', {
             method: 'POST',
-            body: JSON.stringify({ document_type_id: docTypeId, name })
+            body: JSON.stringify({ document_type_id: docTypeId, name, file_type: fileType })
         });
     },
 
@@ -326,12 +387,49 @@ const apiService = {
         });
     },
 
+    async addFormField(docTypeId, fieldData) {
+        return await this.makeRequest('/documents/manage.php', {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'add_form_field',
+                document_type_id: docTypeId,
+                field_name: fieldData.field_name,
+                field_type: fieldData.field_type,
+                is_required: fieldData.is_required ? 1 : 0
+            })
+        });
+    },
+
+    async deleteFormField(fieldId) {
+        return await this.makeRequest('/documents/manage.php', {
+            method: 'DELETE',
+            body: JSON.stringify({
+                action: 'delete_form_field',
+                field_id: fieldId
+            })
+        });
+    },
+
     async getUsers() {
         return await this.makeRequest('/users');
     },
 
     async getUserDetails(userId) {
         return await this.makeRequest(`/users/get_user_details.php?id=${userId}`);
+    },
+
+    async createDocumentType(data) {
+        return await this.makeRequest('/documents/manage.php', {
+            method: 'POST',
+            body: data
+        });
+    },
+
+    async updateDocumentTypeManage(id, data) {
+        return await this.makeRequest('/documents/manage.php', {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        });
     }
 };
 
@@ -547,11 +645,11 @@ async function openRequestModal(request) {
         </div>
     `;
 
-    // Fetch and render documents
+    // Fetch and render documents and form data
     try {
         const result = await apiService.getRequestDocuments(request.request_id);
         if (result.success) {
-            renderRequestDocuments(result.data);
+            renderRequestDocumentsAndFormData(result.data);
         }
     } catch (error) {
         console.error('Failed to load request documents:', error);
@@ -581,24 +679,84 @@ async function openRequestModal(request) {
     modal.focus();
 }
 
-function renderRequestDocuments(documents) {
+function renderRequestDocumentsAndFormData(data) {
     const documentsSection = document.getElementById('requestDocumentsSection');
-    if (!documents || documents.length === 0) {
-        documentsSection.innerHTML = '<p>No documents uploaded for this request.</p>';
-        return;
-    }
-
-    let documentsHTML = '<h4>Uploaded Documents</h4>';
-    documents.forEach(doc => {
-        documentsHTML += `
-            <div class="document-row">
-                <span>${doc.file_name}</span>
-                <a href="/student_affairs/uploads/${doc.file_path}" class="btn blue small" download>Download</a>
+    let html = '';
+    
+    // Render custom form data if available
+    if (data.form_data && data.form_data.length > 0) {
+        html += `
+            <div class="form-data-section">
+                <h4>📝 Application Form Data</h4>
+                <div class="form-data-container">
+        `;
+        
+        data.form_data.forEach(field => {
+            html += `
+                <div class="form-data-row">
+                    <div class="form-data-label">${field.field_name}:</div>
+                    <div class="form-data-value">${field.field_value || 'N/A'}</div>
+                </div>
+            `;
+        });
+        
+        html += `
+                </div>
             </div>
         `;
-    });
+    }
+    
+    // Render uploaded files
+    if (data.uploaded_files && data.uploaded_files.length > 0) {
+        html += `
+            <div class="uploaded-files-section">
+                <h4>📎 Uploaded Requirements</h4>
+                <div class="documents-container">
+        `;
+        
+        data.uploaded_files.forEach(doc => {
+            const fileIcon = getFileIcon(doc.file_name);
+            const fileSize = doc.file_size ? `(${(doc.file_size / 1024).toFixed(2)} KB)` : '';
+            
+            html += `
+                <div class="document-row">
+                    <div class="document-info">
+                        <span class="file-icon">${fileIcon}</span>
+                        <div>
+                            <div class="document-name">${doc.requirement_name || 'Document'}</div>
+                            <div class="document-filename">${doc.file_name} ${fileSize}</div>
+                        </div>
+                    </div>
+                    <a href="/student_affairs/${doc.file_path}" class="btn blue small" target="_blank" download>
+                        Download
+                    </a>
+                </div>
+            `;
+        });
+        
+        html += `
+                </div>
+            </div>
+        `;
+    } else if (!data.form_data || data.form_data.length === 0) {
+        html = '<p style="color: #6c757d; font-style: italic;">No additional documents or form data submitted for this request.</p>';
+    }
+    
+    documentsSection.innerHTML = html;
+}
 
-    documentsSection.innerHTML = documentsHTML;
+function getFileIcon(filename) {
+    const ext = filename.split('.').pop().toLowerCase();
+    const icons = {
+        'pdf': '📄',
+        'doc': '📝',
+        'docx': '📝',
+        'jpg': '🖼️',
+        'jpeg': '🖼️',
+        'png': '🖼️',
+        'gif': '🖼️'
+    };
+    return icons[ext] || '📎';
 }
 
 // Update request status
@@ -716,13 +874,34 @@ function setupFileUploadEventListeners() {
     });
 }
 
-// Document type modal functions
+// Document type modal functions - Edit existing
 async function openDocTypeModal(docType) {
     console.log('Opening modal for docType:', docType);
-    currentEditingDocType = { ...docType };
+    
+    // Load full document type details with form fields from manage.php
+    try {
+        const result = await apiService.getDocumentTypesDetailed();
+        if (result.success) {
+            const detailedDocType = result.data.find(d => d.id == docType.id);
+            if (detailedDocType) {
+                currentEditingDocType = { ...detailedDocType };
+                console.log('Loaded detailed doc type with form fields:', currentEditingDocType);
+            } else {
+                currentEditingDocType = { ...docType };
+            }
+        }
+    } catch (error) {
+        console.error('Failed to load detailed doc type:', error);
+        currentEditingDocType = { ...docType };
+    }
+    
     currentEditingDocType.templateFile = null;
     
-    document.getElementById('editDocTypeName').value = docType.name;
+    document.getElementById('docTypeModal-heading').textContent = 'Edit Document Type';
+    document.getElementById('editDocTypeName').value = currentEditingDocType.name;
+    document.getElementById('editDocTypeCode').value = currentEditingDocType.type_code;
+    document.getElementById('editDocTypeCategory').value = currentEditingDocType.category || 'request';
+    document.getElementById('editDocTypeDescription').value = currentEditingDocType.description || '';
     
     // Update current template display
     updateCurrentTemplateDisplay();
@@ -737,137 +916,368 @@ async function openDocTypeModal(docType) {
         setupFileUploadEventListeners();
         fileUploadInitialized = true;
     }
-    
-    // Save button functionality
-    document.getElementById('saveDocTypeBtn').onclick = function() {
-        handleSaveDocumentType(docType.id);
-    };
 
     // Load requirements for this document type
-    await loadRequirementsForDocType(docType.id);
+    await loadRequirementsForDocType(currentEditingDocType.id);
+    
+    // Load form fields (now with IDs from manage.php)
+    console.log('Rendering form fields:', currentEditingDocType.form_fields);
+    renderFormFields(currentEditingDocType.form_fields || []);
 
-    // Store the docTypeId on the container
-    const requirementsContainer = document.getElementById('requirementsContainer');
-    requirementsContainer.setAttribute('data-doc-type-id', docType.id);
+    // Setup event listeners
+    setupDocTypeModalListeners();
+}
 
-    // Add requirement functionality
-    const addRequirementBtn = document.getElementById('addRequirementBtn');
-    addRequirementBtn.onclick = function() {
-        handleAddRequirement();
+// Render form fields in modal
+function renderFormFields(fields) {
+    const container = document.getElementById('formFieldsContainer');
+    container.innerHTML = '';
+    
+    if (!currentEditingDocType.form_fields) {
+        currentEditingDocType.form_fields = [];
+    }
+    
+    fields.forEach((field, index) => {
+        addFormFieldToDOM(field, index);
+    });
+}
+
+function addFormField() {
+    const field = {
+        field_name: '',
+        field_type: 'text',
+        is_required: false
     };
+    
+    if (!currentEditingDocType.form_fields) {
+        currentEditingDocType.form_fields = [];
+    }
+    
+    currentEditingDocType.form_fields.push(field);
+    addFormFieldToDOM(field, currentEditingDocType.form_fields.length - 1);
+}
+
+function addFormFieldToDOM(field, index) {
+    const container = document.getElementById('formFieldsContainer');
+    const fieldDiv = document.createElement('div');
+    fieldDiv.className = 'form-field-item';
+    fieldDiv.setAttribute('data-index', index);
+    
+    fieldDiv.innerHTML = `
+        <div class="form-field-row">
+            <input type="text" class="field-name-input" placeholder="Field name (e.g., Student Number)" value="${field.field_name || ''}" />
+            <select class="field-type-select">
+                <option value="text" ${field.field_type === 'text' ? 'selected' : ''}>Text</option>
+                <option value="number" ${field.field_type === 'number' ? 'selected' : ''}>Number</option>
+                <option value="email" ${field.field_type === 'email' ? 'selected' : ''}>Email</option>
+                <option value="date" ${field.field_type === 'date' ? 'selected' : ''}>Date</option>
+                <option value="textarea" ${field.field_type === 'textarea' ? 'selected' : ''}>Text Area</option>
+            </select>
+            <label class="field-required-label">
+                <input type="checkbox" class="field-required-checkbox" ${field.is_required ? 'checked' : ''} />
+                Required
+            </label>
+            <button type="button" class="btn red small remove-field-btn">Remove</button>
+        </div>
+    `;
+    
+    container.appendChild(fieldDiv);
+    
+    // Add event listeners
+    const nameInput = fieldDiv.querySelector('.field-name-input');
+    const typeSelect = fieldDiv.querySelector('.field-type-select');
+    const requiredCheckbox = fieldDiv.querySelector('.field-required-checkbox');
+    const removeBtn = fieldDiv.querySelector('.remove-field-btn');
+    
+    nameInput.addEventListener('input', function() {
+        currentEditingDocType.form_fields[index].field_name = this.value;
+    });
+    
+    typeSelect.addEventListener('change', function() {
+        currentEditingDocType.form_fields[index].field_type = this.value;
+    });
+    
+    requiredCheckbox.addEventListener('change', function() {
+        currentEditingDocType.form_fields[index].is_required = this.checked;
+    });
+    
+    removeBtn.addEventListener('click', async function() {
+        const fieldToRemove = currentEditingDocType.form_fields[index];
+        const fieldName = fieldToRemove.field_name || 'this field';
+        
+        if (!confirm(`Are you sure you want to delete "${fieldName}"?`)) {
+            return;
+        }
+        
+        // If this field has an ID, it exists in the database and needs to be deleted via API
+        if (fieldToRemove.id && fieldToRemove.id !== 'undefined' && fieldToRemove.id !== 'null') {
+            try {
+                const result = await apiService.deleteFormField(fieldToRemove.id);
+                if (!result.success) {
+                    alert('Failed to delete form field from database');
+                    return;
+                }
+            } catch (error) {
+                console.error('Error deleting form field:', error);
+                alert('Error deleting form field from database');
+                return;
+            }
+        }
+        
+        // Remove from local array and re-render
+        currentEditingDocType.form_fields.splice(index, 1);
+        renderFormFields(currentEditingDocType.form_fields);
+    });
+}
+
+// Render requirements in modal
+function renderRequirements(requirements) {
+    const container = document.getElementById('requirementsContainer');
+    container.innerHTML = '';
+    
+    if (!currentEditingDocType.requirements) {
+        currentEditingDocType.requirements = [];
+    }
+    
+    if (requirements.length === 0) {
+        container.innerHTML = '<p class="no-requirements">No file upload requirements yet.</p>';
+        currentEditingDocType.requirements = [];
+        return;
+    }
+    
+    const ul = document.createElement('ul');
+    ul.className = 'requirements-list';
+    
+    requirements.forEach((req, index) => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+            <span class="requirement-name">${req.requirement_name || req.name}</span>
+            <span class="requirement-type">(${req.file_type || 'any'})</span>
+            <button type="button" class="btn red small remove-req-btn" data-req-id="${req.id}" data-index="${index}">Remove</button>
+        `;
+        ul.appendChild(li);
+        
+        // Add event listener for remove button
+        li.querySelector('.remove-req-btn').addEventListener('click', async function() {
+            const reqId = this.getAttribute('data-req-id');
+            const reqIndex = parseInt(this.getAttribute('data-index'));
+            
+            if (!confirm(`Are you sure you want to delete the requirement "${req.requirement_name || req.name}"?`)) {
+                return;
+            }
+            
+            // If this requirement has an ID (not null, undefined, or 'undefined'), it exists in the database
+            if (reqId && reqId !== 'undefined' && reqId !== 'null') {
+                try {
+                    const result = await apiService.deleteRequirement(reqId);
+                    if (result.success) {
+                        showAdminNotification('Requirement deleted successfully!', 'success');
+                    } else {
+                        throw new Error(result.message);
+                    }
+                } catch (error) {
+                    showAdminNotification(`Failed to delete requirement: ${error.message}`, 'error');
+                    return; // Don't remove from UI if deletion failed
+                }
+            } else {
+                // New requirement (not saved yet), just remove from local array
+                console.log('Removing new requirement from local array (not saved to DB yet)');
+            }
+            
+            // Remove from local array and re-render
+            currentEditingDocType.requirements.splice(reqIndex, 1);
+            renderRequirements(currentEditingDocType.requirements);
+        });
+    });
+    
+    container.appendChild(ul);
+}
+
+function addRequirement() {
+    const input = document.getElementById('newRequirementInput');
+    const fileTypeSelect = document.getElementById('requirementFileType');
+    const name = input.value.trim();
+    
+    if (!name) {
+        alert('Please enter a requirement name.');
+        return;
+    }
+    
+    if (!currentEditingDocType.requirements) {
+        currentEditingDocType.requirements = [];
+    }
+    
+    const requirement = {
+        requirement_name: name,
+        name: name,
+        file_type: fileTypeSelect.value
+    };
+    
+    currentEditingDocType.requirements.push(requirement);
+    renderRequirements(currentEditingDocType.requirements);
+    
+    input.value = '';
+    fileTypeSelect.value = 'image';
 }
 
 async function loadRequirementsForDocType(docTypeId) {
     try {
         const result = await apiService.getRequirements(docTypeId);
         if (result.success) {
-            populateRequirementsList(result.data, docTypeId);
+            // Set the requirements directly, don't push to existing array
+            currentEditingDocType.requirements = result.data || [];
+            renderRequirements(currentEditingDocType.requirements);
         } else {
             throw new Error(result.message);
         }
     } catch (error) {
         console.error('Failed to load requirements for doc type:', error);
-        populateRequirementsList([], docTypeId);
-    }
-}
-
-function populateRequirementsList(requirements, docTypeId) {
-    const requirementsContainer = document.getElementById('requirementsContainer');
-    requirementsContainer.innerHTML = '';
-    requirementsContainer.setAttribute('data-doc-type-id', docTypeId);
-
-    if (requirements.length === 0) {
-        requirementsContainer.innerHTML = '<p>No requirements for this document type.</p>';
-        return;
-    }
-
-    const ul = document.createElement('ul');
-    requirements.forEach(req => {
-        const li = document.createElement('li');
-        li.innerHTML = `
-            <span>${req.requirement_name}</span>
-            <button class="btn red small delete-requirement" data-id="${req.id}">Delete</button>
-        `;
-        ul.appendChild(li);
-    });
-    requirementsContainer.appendChild(ul);
-
-    // Add event listeners to delete buttons
-    document.querySelectorAll('.delete-requirement').forEach(button => {
-        button.addEventListener('click', function() {
-            const requirementId = this.getAttribute('data-id');
-            handleDeleteRequirement(requirementId, docTypeId);
-        });
-    });
-}
-
-async function handleAddRequirement() {
-    const requirementsContainer = document.getElementById('requirementsContainer');
-    const docTypeId = requirementsContainer.getAttribute('data-doc-type-id');
-    
-    const input = document.getElementById('newRequirementInput');
-    const name = input.value.trim();
-    if (!name) return;
-
-    if (!docTypeId) { // Add a guard
-        alert('Error: Could not find document type ID.');
-        return;
-    }
-
-    try {
-        const result = await apiService.addRequirement(docTypeId, name);
-        if (result.success) {
-            alert('Requirement added successfully!');
-            input.value = '';
-            await loadRequirementsForDocType(docTypeId);
-        }
-    } catch (error) {
-        alert('Failed to add requirement: ' + error.message);
-    }
-}
-
-async function handleDeleteRequirement(requirementId, docTypeId) {
-    if (!confirm('Are you sure you want to delete this requirement?')) return;
-
-    try {
-        const result = await apiService.deleteRequirement(requirementId);
-        if (result.success) {
-            alert('Requirement deleted successfully!');
-            await loadRequirementsForDocType(docTypeId);
-        }
-    } catch (error) {
-        alert('Failed to delete requirement: ' + error.message);
+        currentEditingDocType.requirements = [];
+        renderRequirements([]);
     }
 }
 
 
 
-async function handleSaveDocumentType(docTypeId) {
-    const newName = document.getElementById('editDocTypeName').value.trim();
+async function handleSaveDocumentType() {
+    const name = document.getElementById('editDocTypeName').value.trim();
+    const typeCode = document.getElementById('editDocTypeCode').value.trim();
+    const category = document.getElementById('editDocTypeCategory').value;
+    const description = document.getElementById('editDocTypeDescription').value.trim();
     const templateFileInput = document.getElementById('templateFileInput');
-    const file = templateFileInput.files[0];
+    const templateFile = templateFileInput.files[0];
 
-    if (!newName) {
-        alert('Document type name cannot be empty.');
+    // Validation
+    if (!name) {
+        alert('Document type name is required.');
+        return;
+    }
+    
+    if (!typeCode) {
+        alert('Type code is required.');
+        return;
+    }
+    
+    if (!category) {
+        alert('Category is required.');
         return;
     }
 
+    // Validate form fields
+    const formFields = currentEditingDocType.form_fields || [];
+    for (let field of formFields) {
+        if (!field.field_name || !field.field_name.trim()) {
+            alert('All form fields must have a name.');
+            return;
+        }
+    }
+
+    try {
+        if (currentEditingDocType.id) {
+            // Editing existing document type
+            await updateExistingDocumentType();
+        } else {
+            // Creating new document type
+            await createNewDocumentType(name, typeCode, category, description, templateFile, formFields);
+        }
+    } catch (error) {
+        alert('Failed to save document type: ' + error.message);
+    }
+}
+
+async function createNewDocumentType(name, typeCode, category, description, templateFile, formFields) {
     const formData = new FormData();
-    formData.append('name', newName);
-    if (file) {
-        formData.append('template', file);
+    formData.append('name', name);
+    formData.append('type_code', typeCode);
+    formData.append('category', category);
+    formData.append('description', description);
+    
+    // Add form fields
+    formData.append('form_fields', JSON.stringify(formFields));
+    
+    // Add template file if provided
+    if (templateFile) {
+        formData.append('template', templateFile);
+    }
+
+    try {
+        const result = await apiService.createDocumentType(formData);
+        if (result.success) {
+            const docTypeId = result.document_type_id;
+            
+            // Add requirements after document type is created
+            const requirements = currentEditingDocType.requirements || [];
+            for (let req of requirements) {
+                await apiService.addRequirement(docTypeId, req.requirement_name || req.name, req.file_type || 'any');
+            }
+            
+            showAdminNotification('Document type created successfully!', 'success');
+            document.getElementById('docTypeModal').style.display = 'none';
+            await loadDocumentTypes();
+        } else {
+            throw new Error(result.message);
+        }
+    } catch (error) {
+        throw error;
+    }
+}
+
+async function updateExistingDocumentType() {
+    const docTypeId = currentEditingDocType.id;
+    const name = document.getElementById('editDocTypeName').value.trim();
+    const typeCode = document.getElementById('editDocTypeCode').value.trim();
+    const description = document.getElementById('editDocTypeDescription').value.trim();
+    const templateFileInput = document.getElementById('templateFileInput');
+    const templateFile = templateFileInput.files[0];
+    
+    const formData = new FormData();
+    formData.append('name', name);
+    if (templateFile) {
+        formData.append('template', templateFile);
     }
     formData.append('_method', 'PUT');
 
     try {
         const result = await apiService.updateDocumentType(docTypeId, formData);
         if (result.success) {
-            alert('Document type updated successfully!');
+            // Save any new form fields (ones without IDs)
+            const formFields = currentEditingDocType.form_fields || [];
+            for (let field of formFields) {
+                // If form field doesn't have an ID, it's new - save it
+                if (!field.id) {
+                    console.log('Saving new form field:', field.field_name);
+                    try {
+                        await apiService.addFormField(docTypeId, field);
+                    } catch (fieldError) {
+                        console.error('Failed to save form field:', fieldError);
+                        showAdminNotification(`Warning: Failed to save form field "${field.field_name}"`, 'error');
+                    }
+                }
+            }
+            
+            // Save any new requirements (ones without IDs)
+            const requirements = currentEditingDocType.requirements || [];
+            for (let req of requirements) {
+                // If requirement doesn't have an ID, it's new - save it
+                if (!req.id) {
+                    console.log('Saving new requirement:', req.requirement_name || req.name);
+                    try {
+                        await apiService.addRequirement(docTypeId, req.requirement_name || req.name, req.file_type || 'any');
+                    } catch (reqError) {
+                        console.error('Failed to save requirement:', reqError);
+                        showAdminNotification(`Warning: Failed to save requirement "${req.requirement_name || req.name}"`, 'error');
+                    }
+                }
+            }
+            
+            showAdminNotification('Document type updated successfully!', 'success');
             document.getElementById('docTypeModal').style.display = 'none';
-            await loadDocumentTypes(); // Reload the list
+            await loadDocumentTypes();
+        } else {
+            throw new Error(result.message);
         }
     } catch (error) {
-        alert('Failed to update document type: ' + error.message);
+        throw error;
     }
 }
 

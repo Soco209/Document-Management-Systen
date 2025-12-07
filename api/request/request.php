@@ -1,12 +1,13 @@
 <?php
-ini_set('display_errors', 0);
+ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
 header("Content-Type: application/json; charset=UTF-8");
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../middleware/auth.php';
-require_once __DIR__ . '/../../vendor/autoload.php';
+// Remove vendor/autoload requirement if not needed
+// require_once __DIR__ . '/../../vendor/autoload.php';
 
 $response = ["success" => false, "message" => "An error occurred."];
 
@@ -38,8 +39,8 @@ try {
                 throw new Exception("Document type and purpose are required.");
             }
 
-            // Get document_type_id from document_types table based on type_code
-            $docTypeQuery = "SELECT id FROM document_types WHERE type_code = :type_code";
+            // Get document_type_id and category from document_types table based on type_code
+            $docTypeQuery = "SELECT id, category FROM document_types WHERE type_code = :type_code";
             $docTypeStmt = $db->prepare($docTypeQuery);
             $docTypeStmt->bindParam(':type_code', $data->document_type);
             $docTypeStmt->execute();
@@ -49,9 +50,12 @@ try {
                 throw new Exception("Invalid document type specified.");
             }
             $document_type_id = $docTypeRow['id'];
+            $category = $docTypeRow['category'];
 
-            // Generate a unique request ID
-            $request_id = "REQ-" . date("Ymd") . "-" . substr(str_shuffle("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"), 0, 5);
+            // Generate a unique request ID based on category
+            // Use "APP-" prefix for application forms, "REQ-" for simple requests
+            $prefix = ($category === 'application') ? "APP" : "REQ";
+            $request_id = "{$prefix}-" . date("Ymd") . "-" . substr(str_shuffle("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"), 0, 5);
 
             $query = "INSERT INTO requests (request_id, student_id, document_type_id, purpose, status) 
                       VALUES (:request_id, :student_id, :document_type_id, :purpose, 'Pending')";
@@ -63,24 +67,35 @@ try {
             $stmt->bindParam(':purpose', $data->purpose);
 
             if ($stmt->execute()) {
-                // Send email notification to student
-                require_once __DIR__ . '/../../utils/email.php';
-                $userQuery = "SELECT full_name, email FROM users WHERE id = :user_id";
-                $userStmt = $db->prepare($userQuery);
-                $userStmt->bindParam(':user_id', $user['id']);
-                $userStmt->execute();
-                $userRow = $userStmt->fetch(PDO::FETCH_ASSOC);
+                // Get the inserted ID for file uploads
+                $insertedId = $db->lastInsertId();
+                
+                // Send email notification to student (optional)
+                try {
+                    if (file_exists(__DIR__ . '/../../utils/email.php')) {
+                        require_once __DIR__ . '/../../utils/email.php';
+                        $userQuery = "SELECT full_name, email FROM users WHERE id = :user_id";
+                        $userStmt = $db->prepare($userQuery);
+                        $userStmt->bindParam(':user_id', $user['id']);
+                        $userStmt->execute();
+                        $userRow = $userStmt->fetch(PDO::FETCH_ASSOC);
 
-                if ($userRow) {
-                    $emailBody = "<h1>Request Submitted</h1>";
-                    $emailBody .= "<p>Your request with ID <strong>{$request_id}</strong> has been submitted successfully.</p>";
-                    $emailBody .= "<p>You will be notified when the status of your request is updated.</p>";
-                    sendEmail($userRow['email'], $userRow['full_name'], "Request Submitted Successfully", $emailBody);
+                        if ($userRow) {
+                            $emailBody = "<h1>Request Submitted</h1>";
+                            $emailBody .= "<p>Your request with ID <strong>{$request_id}</strong> has been submitted successfully.</p>";
+                            $emailBody .= "<p>You will be notified when the status of your request is updated.</p>";
+                            sendEmail($userRow['email'], $userRow['full_name'], "Request Submitted Successfully", $emailBody);
+                        }
+                    }
+                } catch (Exception $emailError) {
+                    // Log email error but don't fail the request
+                    error_log("Email notification failed: " . $emailError->getMessage());
                 }
 
                 $response["success"] = true;
                 $response["message"] = "Request submitted successfully.";
                 $response["request_id"] = $request_id;
+                $response["id"] = $insertedId; // Add database ID for file uploads
                 $response["id"] = $db->lastInsertId(); // Auto-increment ID
                 http_response_code(201);
             } else {
@@ -154,7 +169,7 @@ try {
                 // Notify student
                 error_log("Update successful, trying to notify student.");
                 
-                // Updated query to get all necessary info for the new email function
+                // Get user details for email notification
                 $userQuery = "SELECT u.id as user_id, u.full_name, u.email, dt.name as document_name
                               FROM users u 
                               JOIN requests r ON u.id = r.student_id 
@@ -167,21 +182,30 @@ try {
                 $userRow = $userStmt->fetch(PDO::FETCH_ASSOC);
 
                 if ($userRow) {
-                    error_log("User found, preparing to send email with NotificationAPI.");
+                    error_log("User found: " . $userRow['email'] . ", sending email notification.");
                     
-                    // Include the email utility file
-                    require_once __DIR__ . '/../../utils/email.php';
-
-                    // Call the new function to send the status update email
-                    sendFormStatusUpdateEmail(
-                        $userRow['user_id'],
-                        $userRow['document_name'],
-                        $data->status,
-                        $data->admin_notes ?? ''
-                    );
-
+                    // Include the email utility file and send notification
+                    try {
+                        require_once __DIR__ . '/../../utils/email.php';
+                        
+                        $emailSent = sendFormStatusUpdateEmail(
+                            $userRow['user_id'],
+                            $userRow['document_name'],
+                            $data->status,
+                            $data->admin_notes ?? ''
+                        );
+                        
+                        if ($emailSent) {
+                            error_log("Email notification sent successfully to: " . $userRow['email']);
+                        } else {
+                            error_log("Email notification failed to send to: " . $userRow['email']);
+                        }
+                    } catch (Exception $emailError) {
+                        error_log("Email notification error: " . $emailError->getMessage());
+                        // Don't throw - we still want to return success for the status update
+                    }
                 } else {
-                    error_log("User not found for the given request ID.");
+                    error_log("User not found for request ID: " . $requestId);
                 }
 
                 $response["success"] = true;
@@ -237,7 +261,15 @@ if ($verifyStmt->rowCount() === 0) {
 
 } catch (Exception $e) {
     error_log("Request API Error: " . $e->getMessage() . " in " . $e->getFile() . " on line " . $e->getLine());
-    $response["message"] = "An internal server error occurred. Please try again later.";
+    
+    // Show actual error message in development (change to generic message in production)
+    $response["message"] = $e->getMessage();
+    $response["error_details"] = [
+        "file" => $e->getFile(),
+        "line" => $e->getLine(),
+        "trace" => $e->getTraceAsString()
+    ];
+    
     http_response_code(500);
 }
 

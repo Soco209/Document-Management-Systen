@@ -70,10 +70,12 @@ function handlePost($conn) {
     }
     
     try {
-        $query = "INSERT INTO required_documents (document_type_id, requirement_name) VALUES (:document_type_id, :name)";
+        $fileType = isset($data->file_type) ? $data->file_type : 'any';
+        $query = "INSERT INTO required_documents (document_type_id, requirement_name, file_type) VALUES (:document_type_id, :name, :file_type)";
         $stmt = $conn->prepare($query);
         $stmt->bindParam(':document_type_id', $data->document_type_id);
         $stmt->bindParam(':name', $data->name);
+        $stmt->bindParam(':file_type', $fileType);
         
         if ($stmt->execute()) {
             http_response_code(201); // Created
