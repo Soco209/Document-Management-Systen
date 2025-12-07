@@ -1,10 +1,5 @@
-# 🎓 JHCSC Student Affairs Management System
-
-A comprehensive web-based system for managing student document requests and applications at **JH Cerilles State College (JHCSC)**. This system streamlines the process of requesting official documents, tracking submissions, and managing applications through the Department of Student Affairs (DSA).
-
----
-
-## 📋 Table of Contents
+JHCSC Student Affairs Management System
+Table of Contents
 
 - [Overview](#overview)
 - [Features](#features)
@@ -22,13 +17,11 @@ A comprehensive web-based system for managing student document requests and appl
 - [Contributors](#contributors)
 - [License](#license)
 
----
-
-## 🎯 Overview
+Overview
 
 The **JHCSC Student Affairs Management System** is designed to digitize and automate the document request process for students and administrators. Students can submit requests for various documents (transcripts, certificates, clearances, etc.) and track their status in real-time. Administrators can manage requests, update statuses, and communicate with students through automated email notifications.
 
-### Purpose
+Purpose
 
 - **Eliminate paperwork** - Digital submission and tracking
 - **Improve transparency** - Real-time status updates
@@ -38,40 +31,40 @@ The **JHCSC Student Affairs Management System** is designed to digitize and auto
 
 ---
 
-## ✨ Features
+Features
 
 ### For Students
-- ✅ **User Registration & Authentication** - Secure JWT-based login
-- ✅ **Document Request Submission** - Request official documents with custom forms
-- ✅ **Dynamic Application Forms** - Fill out applications with various field types
-- ✅ **File Upload Management** - Upload required documents (PDFs, images, DOCX)
-- ✅ **Request Tracking** - Real-time status updates (Pending, Processing, Completed)
-- ✅ **Email Notifications** - Receive updates when request status changes
-- ✅ **Dashboard Analytics** - View submission statistics and history
-- ✅ **Template Preview** - Preview document templates before requesting
+- **User Registration & Authentication** - Secure JWT-based login
+- **Document Request Submission** - Request official documents with custom forms
+- **Dynamic Application Forms** - Fill out applications with various field types
+- **File Upload Management** - Upload required documents (PDFs, images, DOCX)
+- **Request Tracking** - Real-time status updates (Pending, Processing, Completed)
+- **Email Notifications** - Receive updates when request status changes
+- **Dashboard Analytics** - View submission statistics and history
+- **Template Preview** - Preview document templates before requesting
 
 ### For Administrators
-- ✅ **Admin Dashboard** - Overview of all requests and statistics
-- ✅ **Request Management** - View, update, and process student requests
-- ✅ **Status Updates** - Change request status with admin notes
-- ✅ **Document Type Management** - Create and manage document types
-- ✅ **Dynamic Form Builder** - Create custom form fields for applications
-- ✅ **User Management** - Manage student and admin accounts
-- ✅ **Requirement Configuration** - Set upload requirements with file type restrictions
-- ✅ **Automated Notifications** - System sends emails on status updates
+- **Admin Dashboard** - Overview of all requests and statistics
+- **Request Management** - View, update, and process student requests
+- **Status Updates** - Change request status with admin notes
+- **Document Type Management** - Create and manage document types
+- **Dynamic Form Builder** - Create custom form fields for applications
+- **User Management** - Manage student and admin accounts
+- **Requirement Configuration** - Set upload requirements with file type restrictions
+- **Automated Notifications** - System sends emails on status updates
 
 ### System Features
-- 🔐 **JWT Authentication** - Secure token-based authentication
-- 📧 **Email Integration** - NotificationAPI for professional emails
-- 🗂️ **File Management** - Organized uploads with validation
-- 📊 **RESTful API** - Clean API architecture
-- 🎨 **Responsive Design** - Works on desktop and mobile
-- 🔍 **Search & Filter** - Easy request filtering and search
-- 📝 **Audit Trail** - Track all changes and submissions
+- **JWT Authentication** - Secure token-based authentication
+- **Email Integration** - NotificationAPI for professional emails
+- **File Management** - Organized uploads with validation
+- **RESTful API** - Clean API architecture
+- **Responsive Design** - Works on desktop and mobile
+- **Search & Filter** - Easy request filtering and search
+- **Audit Trail** - Track all changes and submissions
 
 ---
 
-## 🛠️ Technology Stack
+Technology Stack
 
 ### Backend
 - **PHP 8.x** - Server-side scripting
@@ -96,7 +89,7 @@ The **JHCSC Student Affairs Management System** is designed to digitize and auto
 
 ---
 
-## 📁 Project Structure
+Project Structure
 
 ```
 student_affairs/
@@ -188,13 +181,12 @@ student_affairs/
 ├── composer.json                   # PHP dependencies
 ├── composer.lock                   # Locked dependencies
 ├── student_affairs.sql             # Database schema
-├── API_STATUS_UPDATE_EMAIL.md      # Email notification docs
 └── README.md                       # This file
 ```
 
 ---
 
-## 🗄️ Database Schema
+Database Schema
 
 The system uses a MySQL database named `student_affairs` with the following tables:
 
@@ -294,7 +286,7 @@ Stores submitted data from dynamic forms.
 
 ---
 
-## 🚀 Installation
+Installation
 
 ### Prerequisites
 - **XAMPP/WAMP** (or similar) with:
@@ -368,7 +360,7 @@ The database includes sample users (password: `password123`):
 
 ---
 
-## ⚙️ Configuration
+Configuration
 
 ### Database Configuration
 Located in `api/config/database.php` and `api/config.php`
@@ -396,7 +388,7 @@ $allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
 
 ---
 
-## 📡 API Documentation
+API Documentation
 
 ### Authentication
 
@@ -552,7 +544,7 @@ For complete API documentation, see `API_STATUS_UPDATE_EMAIL.md`
 
 ---
 
-## 👥 User Roles
+User Roles
 
 ### Student Role
 **Permissions:**
@@ -591,7 +583,7 @@ For complete API documentation, see `API_STATUS_UPDATE_EMAIL.md`
 
 ---
 
-## 📧 Email Notifications
+Email Notifications
 
 The system automatically sends professional email notifications using **NotificationAPI**.
 
@@ -634,7 +626,7 @@ See `API_STATUS_UPDATE_EMAIL.md` for detailed email documentation.
 
 ---
 
-## 🔒 Security Features
+Security Features
 
 ### Authentication & Authorization
 - **JWT Tokens** - Secure, stateless authentication
@@ -675,7 +667,7 @@ $decoded = JWT::decode($token, $secret_key, ['HS256']);
 
 ---
 
-## 💻 Development
+Development
 
 ### Adding New Features
 
@@ -729,7 +721,7 @@ Check logs:
 
 ---
 
-## 🐛 Troubleshooting
+Troubleshooting
 
 ### Common Issues
 
@@ -788,65 +780,15 @@ Error: CORS policy blocked
 
 ---
 
-## 🤝 Contributors
+Contributors
 
 ### Development Team
 - **ALITA Team** - Initial development and requirements
 - See `SRS/SRS-ALITA-3-FINAL-PROGRAMMER.docx` for full documentation
 
-### Contact
-- **Email:** admin@studentaffairs.edu
-- **Institution:** JH Cerilles State College
-- **Location:** Pagadian Campus, Pagadian, Zamboanga del Sur
-
----
-
-## 📄 License
-
-© 2025 JH Cerilles State College. All rights reserved.
-
-This project is developed for educational purposes and internal use by JHCSC Department of Student Affairs.
-
----
-
-## 🎯 Future Enhancements
-
-### Planned Features
-- [ ] SMS notifications
-- [ ] In-app notifications
-- [ ] Mobile application
-- [ ] Advanced reporting and analytics
-- [ ] Document e-signature
-- [ ] Payment integration
-- [ ] Multi-language support
-- [ ] Chatbot support
-- [ ] API rate limiting
-- [ ] Two-factor authentication
-
-### Known Issues
-- None currently reported
-
----
-
-## 📞 Support
-
-For technical support or questions:
-1. Check this README
-2. Review `API_STATUS_UPDATE_EMAIL.md`
-3. Check PHP error logs
-4. Contact system administrator
-
----
-
-## 🙏 Acknowledgments
+Acknowledgments
 
 - **JH Cerilles State College** - For supporting this project
 - **Department of Student Affairs** - For requirements and feedback
 - **NotificationAPI** - Email delivery service
 - **Composer** - Dependency management
-
----
-
-**Last Updated:** January 2025  
-**Version:** 1.0.0  
-**Status:** Production Ready ✅
