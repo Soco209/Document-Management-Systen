@@ -39,8 +39,8 @@ try {
                 throw new Exception("Document type and purpose are required.");
             }
 
-            // Get document_type_id and category from document_types table based on type_code
-            $docTypeQuery = "SELECT id, category FROM document_types WHERE type_code = :type_code";
+            // Get document_type_id from document_types table based on type_code
+            $docTypeQuery = "SELECT id FROM document_types WHERE type_code = :type_code";
             $docTypeStmt = $db->prepare($docTypeQuery);
             $docTypeStmt->bindParam(':type_code', $data->document_type);
             $docTypeStmt->execute();
@@ -50,11 +50,10 @@ try {
                 throw new Exception("Invalid document type specified.");
             }
             $document_type_id = $docTypeRow['id'];
-            $category = $docTypeRow['category'];
 
-            // Generate a unique request ID based on category
-            // Use "APP-" prefix for application forms, "REQ-" for simple requests
-            $prefix = ($category === 'application') ? "APP" : "REQ";
+            // Generate a unique request ID
+            // Use "REQ-" prefix for all requests (both applications and simple requests)
+            $prefix = "REQ";
             $request_id = "{$prefix}-" . date("Ymd") . "-" . substr(str_shuffle("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"), 0, 5);
 
             $query = "INSERT INTO requests (request_id, student_id, document_type_id, purpose, status) 
@@ -69,6 +68,7 @@ try {
             if ($stmt->execute()) {
                 // Get the inserted ID for file uploads
                 $insertedId = $db->lastInsertId();
+                error_log("Request created successfully - ID: " . $insertedId . ", Request ID: " . $request_id);
                 
                 // Send email notification to student (optional)
                 try {
@@ -95,8 +95,7 @@ try {
                 $response["success"] = true;
                 $response["message"] = "Request submitted successfully.";
                 $response["request_id"] = $request_id;
-                $response["id"] = $insertedId; // Add database ID for file uploads
-                $response["id"] = $db->lastInsertId(); // Auto-increment ID
+                $response["id"] = $insertedId; // Database ID for file uploads
                 http_response_code(201);
             } else {
                 throw new Exception("Failed to create request in the database.");

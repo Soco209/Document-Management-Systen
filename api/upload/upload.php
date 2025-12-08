@@ -28,6 +28,20 @@ try {
     }
 
     $request_id = $_POST['request_id'];
+    error_log("Upload - Received request_id: " . $request_id . " (type: " . gettype($request_id) . ") for user_id: " . $user_id);
+    
+    // Verify that the request exists and belongs to the current user
+    $verifyQuery = "SELECT id FROM requests WHERE id = :request_id AND student_id = :student_id";
+    $verifyStmt = $db->prepare($verifyQuery);
+    $verifyStmt->bindParam(':request_id', $request_id, PDO::PARAM_INT);
+    $verifyStmt->bindParam(':student_id', $user_id, PDO::PARAM_INT);
+    $verifyStmt->execute();
+    
+    if ($verifyStmt->rowCount() === 0) {
+        throw new Exception("Request not found or access denied. Request ID: " . $request_id . ", User ID: " . $user_id);
+    }
+    
+    error_log("Upload - Request verified successfully");
     $upload_dir = "../../uploads/" . $request_id . "/";
 
     if (!is_dir($upload_dir)) {
@@ -72,13 +86,20 @@ try {
             $query = "INSERT INTO uploaded_files (request_id, requirement_name, file_name, file_path, file_size, mime_type, created_at) 
                      VALUES (:request_id, :requirement_name, :file_name, :file_path, :file_size, :mime_type, NOW())";
             $stmt = $db->prepare($query);
-            $stmt->bindParam(":request_id", $request_id);
+            $stmt->bindParam(":request_id", $request_id, PDO::PARAM_INT);
             $stmt->bindParam(":requirement_name", $requirement_name);
             $stmt->bindParam(":file_name", $file_name);
             $stmt->bindParam(":file_path", $file_path);
             $stmt->bindParam(":file_size", $file_size);
             $stmt->bindParam(":mime_type", $file_type);
-            $stmt->execute();
+            
+            error_log("Upload - Inserting file: " . $file_name . " for request_id: " . $request_id);
+            
+            if (!$stmt->execute()) {
+                $errorInfo = $stmt->errorInfo();
+                error_log("Upload - Database insert failed: " . json_encode($errorInfo));
+                throw new Exception("Database error: " . $errorInfo[2]);
+            }
 
             $uploaded_files[] = [
                 'file_name' => $file_name,
