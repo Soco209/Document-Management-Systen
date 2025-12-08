@@ -142,11 +142,34 @@ try {
                     throw new Exception("Cannot delete this document type because it is currently in use by existing requests.");
                 }
 
+                // Get the template path before deleting the record
+                $getTemplateQuery = "SELECT template_path FROM document_types WHERE id = :id";
+                $getTemplateStmt = $db->prepare($getTemplateQuery);
+                $getTemplateStmt->bindParam(':id', $id);
+                $getTemplateStmt->execute();
+                $templateData = $getTemplateStmt->fetch(PDO::FETCH_ASSOC);
+                $templatePath = $templateData['template_path'] ?? null;
+
+                // Delete the database record
                 $query = "DELETE FROM document_types WHERE id = :id";
                 $stmt = $db->prepare($query);
                 $stmt->bindParam(':id', $id);
 
                 if ($stmt->execute()) {
+                    // Delete the physical template file if it exists
+                    if ($templatePath) {
+                        $fullPath = __DIR__ . '/../../' . ltrim($templatePath, '/');
+                        if (file_exists($fullPath)) {
+                            if (unlink($fullPath)) {
+                                error_log("Template file deleted: " . $fullPath);
+                            } else {
+                                error_log("Warning: Failed to delete template file: " . $fullPath);
+                            }
+                        } else {
+                            error_log("Template file not found: " . $fullPath);
+                        }
+                    }
+                    
                     $response["success"] = true;
                     $response["message"] = "Document type deleted successfully.";
                     http_response_code(200);
