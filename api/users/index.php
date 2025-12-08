@@ -7,6 +7,7 @@ header("Access-Control-Allow-Credentials: true");
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../middleware/auth.php';
+require_once __DIR__ . '/../../utils/email_smtp.php';
 
 try {
     $database = new Database();
@@ -115,12 +116,17 @@ function handleUpdateUser($db, $user) {
             $params[':role'] = $input['role'];
         }
 
+        $statusChanged = false;
+        $newStatus = null;
+        
         if (isset($input['status'])) {
             if (!in_array($input['status'], ['active', 'inactive'])) {
                 throw new Exception("Invalid status");
             }
             $fields[] = 'status = :status';
             $params[':status'] = $input['status'];
+            $statusChanged = true;
+            $newStatus = $input['status'];
         }
 
         if (empty($fields)) {
@@ -131,6 +137,16 @@ function handleUpdateUser($db, $user) {
         $stmt = $db->prepare($query);
         
         if ($stmt->execute($params)) {
+            // Send email notification if status was changed
+            if ($statusChanged && $newStatus) {
+                try {
+                    sendUserStatusUpdateEmail($userId, $newStatus);
+                } catch (Exception $emailError) {
+                    // Log the error but don't fail the update
+                    error_log("Failed to send status update email: " . $emailError->getMessage());
+                }
+            }
+            
             echo json_encode([
                 "success" => true,
                 "message" => "User updated successfully"

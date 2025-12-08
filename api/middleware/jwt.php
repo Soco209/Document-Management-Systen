@@ -64,4 +64,3 @@ function get_jwt_payload($jwt) {
     $payload = base64url_decode($tokenParts[1]);
     return json_decode($payload, true);
 }
-?>

@@ -9,11 +9,16 @@ class ComposerStaticInitc94149a5a6fda9973e8100d6a0b6c020
     public static $prefixLengthsPsr4 = array (
         'P' => 
         array (
+            'PHPMailer\\PHPMailer\\' => 20,
             'PHPCS_SecurityAudit\\' => 20,
         ),
     );
 
     public static $prefixDirsPsr4 = array (
+        'PHPMailer\\PHPMailer\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/phpmailer/phpmailer/src',
+        ),
         'PHPCS_SecurityAudit\\' => 
         array (
             0 => __DIR__ . '/..' . '/pheromone/phpcs-security-audit/Security',

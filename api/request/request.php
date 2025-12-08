@@ -1,8 +1,9 @@
 <?php
-ini_set('display_errors', 1);
-error_reporting(E_ALL);
+// Start output buffering to catch any stray output
+ob_start();
 
-header("Content-Type: application/json; charset=UTF-8");
+ini_set('display_errors', 0); // Disable display_errors to prevent output
+error_reporting(E_ALL);
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../middleware/auth.php';
@@ -72,8 +73,8 @@ try {
                 
                 // Send email notification to student (optional)
                 try {
-                    if (file_exists(__DIR__ . '/../../utils/email.php')) {
-                        require_once __DIR__ . '/../../utils/email.php';
+                    if (file_exists(__DIR__ . '/../../utils/email_smtp.php')) {
+                        require_once __DIR__ . '/../../utils/email_smtp.php';
                         $userQuery = "SELECT full_name, email FROM users WHERE id = :user_id";
                         $userStmt = $db->prepare($userQuery);
                         $userStmt->bindParam(':user_id', $user['id']);
@@ -185,7 +186,7 @@ try {
                     
                     // Include the email utility file and send notification
                     try {
-                        require_once __DIR__ . '/../../utils/email.php';
+                        require_once __DIR__ . '/../../utils/email_smtp.php';
                         
                         $emailSent = sendFormStatusUpdateEmail(
                             $userRow['user_id'],
@@ -226,56 +227,24 @@ try {
                 throw new Exception("Request ID is required.");
             }
 
-            // Verify ownership and status and get the internal ID
+            // Verify ownership and status
             $verifyQuery = "SELECT id FROM requests WHERE request_id = :request_id AND student_id = :student_id AND status = 'Pending'";
             $verifyStmt = $db->prepare($verifyQuery);
             $verifyStmt->bindParam(':request_id', $requestId);
             $verifyStmt->bindParam(':student_id', $user['id']);
             $verifyStmt->execute();
-            
-            if ($verifyStmt->rowCount() === 0) {
+if ($verifyStmt->rowCount() === 0) {
                 throw new Exception("Request not found, does not belong to you, or is not in 'Pending' status.", 403);
             }
-            
-            $requestData = $verifyStmt->fetch(PDO::FETCH_ASSOC);
-            $internalRequestId = $requestData['id'];
 
-            // Get all uploaded files for this request before deleting
-            $filesQuery = "SELECT file_path FROM uploaded_files WHERE request_id = :request_id";
-            $filesStmt = $db->prepare($filesQuery);
-            $filesStmt->bindParam(':request_id', $internalRequestId, PDO::PARAM_INT);
-            $filesStmt->execute();
-            $uploadedFiles = $filesStmt->fetchAll(PDO::FETCH_ASSOC);
-
-            // Delete the request (this will cascade delete uploaded_files records)
+            // Delete the request
             $deleteQuery = "DELETE FROM requests WHERE request_id = :request_id";
             $deleteStmt = $db->prepare($deleteQuery);
-            $deleteStmt->bindParam(':request_id', $requestId);
+            $deleteStmt->bindParam(':request_id', $requestId); // FIXED: was :request_.id
 
             if ($deleteStmt->execute()) {
-                // Delete physical files after successful database deletion
-                $deletedFilesCount = 0;
-                foreach ($uploadedFiles as $file) {
-                    if (!empty($file['file_path'])) {
-                        $fullPath = __DIR__ . '/../../' . ltrim($file['file_path'], '/');
-                        if (file_exists($fullPath)) {
-                            if (unlink($fullPath)) {
-                                $deletedFilesCount++;
-                                error_log("Deleted file: " . $fullPath);
-                            } else {
-                                error_log("Warning: Failed to delete file: " . $fullPath);
-                            }
-                        } else {
-                            error_log("File not found: " . $fullPath);
-                        }
-                    }
-                }
-                
-                error_log("Request deleted: " . $requestId . ", Files deleted: " . $deletedFilesCount);
-                
                 $response["success"] = true;
                 $response["message"] = "Request deleted successfully.";
-                $response["deleted_files"] = $deletedFilesCount;
                 http_response_code(200);
             } else {
                 throw new Exception("Failed to delete the request.");
@@ -304,4 +273,12 @@ try {
     http_response_code(500);
 }
 
+// Clean any output that might have been generated
+if (ob_get_length()) {
+    ob_clean();
+}
+
+// Send headers and JSON response
+header("Content-Type: application/json; charset=UTF-8");
 echo json_encode($response);
+ob_end_flush();

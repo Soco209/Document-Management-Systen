@@ -81,5 +81,3 @@ function getRole() {
 function isAdmin() {
     return getRole() === 'admin';
 }
-
-?>

@@ -143,7 +143,8 @@ class NotificationAPI
             'Authorization: Basic ' . base64_encode($this->clientId . ":" . $this->clientSecret);
 
         curl_setopt($curl, CURLOPT_HTTPHEADER, [
-            $authorizationHeader
+            $authorizationHeader,
+            'Content-Type: application/json'
         ]);
         curl_setopt($curl, CURLOPT_URL, $url);
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
@@ -153,19 +154,19 @@ class NotificationAPI
         curl_close($curl);
 
         if ($info['http_code'] >= 300) {
-            print_r([
+            error_log("NotificationAPI error: " . print_r([
                 "NotificationAPI error.",
                 $response,
                 $info
-            ]);
+            ], true));
         }
 
         if ($info['http_code'] == "202") {
-            print_r([
+            error_log("NotificationAPI warning: " . print_r([
                 "NotificationAPI warning.",
                 $response,
                 $info
-            ]);
+            ], true));
         }
 
         return $response;

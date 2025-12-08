@@ -1,5 +1,6 @@
 {
     "require": {
-        "notificationapi/notificationapi-php-server-sdk": "^1.0"
+        "notificationapi/notificationapi-php-server-sdk": "^1.0",
+        "phpmailer/phpmailer": "^7.0"
     }
 }
