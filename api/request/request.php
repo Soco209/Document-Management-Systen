@@ -226,24 +226,56 @@ try {
                 throw new Exception("Request ID is required.");
             }
 
-            // Verify ownership and status
+            // Verify ownership and status and get the internal ID
             $verifyQuery = "SELECT id FROM requests WHERE request_id = :request_id AND student_id = :student_id AND status = 'Pending'";
             $verifyStmt = $db->prepare($verifyQuery);
             $verifyStmt->bindParam(':request_id', $requestId);
             $verifyStmt->bindParam(':student_id', $user['id']);
             $verifyStmt->execute();
-if ($verifyStmt->rowCount() === 0) {
+            
+            if ($verifyStmt->rowCount() === 0) {
                 throw new Exception("Request not found, does not belong to you, or is not in 'Pending' status.", 403);
             }
+            
+            $requestData = $verifyStmt->fetch(PDO::FETCH_ASSOC);
+            $internalRequestId = $requestData['id'];
 
-            // Delete the request
+            // Get all uploaded files for this request before deleting
+            $filesQuery = "SELECT file_path FROM uploaded_files WHERE request_id = :request_id";
+            $filesStmt = $db->prepare($filesQuery);
+            $filesStmt->bindParam(':request_id', $internalRequestId, PDO::PARAM_INT);
+            $filesStmt->execute();
+            $uploadedFiles = $filesStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Delete the request (this will cascade delete uploaded_files records)
             $deleteQuery = "DELETE FROM requests WHERE request_id = :request_id";
             $deleteStmt = $db->prepare($deleteQuery);
-            $deleteStmt->bindParam(':request_id', $requestId); // FIXED: was :request_.id
+            $deleteStmt->bindParam(':request_id', $requestId);
 
             if ($deleteStmt->execute()) {
+                // Delete physical files after successful database deletion
+                $deletedFilesCount = 0;
+                foreach ($uploadedFiles as $file) {
+                    if (!empty($file['file_path'])) {
+                        $fullPath = __DIR__ . '/../../' . ltrim($file['file_path'], '/');
+                        if (file_exists($fullPath)) {
+                            if (unlink($fullPath)) {
+                                $deletedFilesCount++;
+                                error_log("Deleted file: " . $fullPath);
+                            } else {
+                                error_log("Warning: Failed to delete file: " . $fullPath);
+                            }
+                        } else {
+                            error_log("File not found: " . $fullPath);
+                        }
+                    }
+                }
+                
+                error_log("Request deleted: " . $requestId . ", Files deleted: " . $deletedFilesCount);
+                
                 $response["success"] = true;
                 $response["message"] = "Request deleted successfully.";
+                $response["deleted_files"] = $deletedFilesCount;
                 http_response_code(200);
             } else {
                 throw new Exception("Failed to delete the request.");
