@@ -130,12 +130,17 @@ function handleGetDocumentTypes($db) {
 
 function handleCreateDocumentType($db) {
     try {
-        // Check if this is a special action (add/delete form field)
+        // Check if this is a special action (add/delete/update form field)
         $rawInput = file_get_contents('php://input');
         $jsonInput = json_decode($rawInput, true);
         
         if (isset($jsonInput['action']) && $jsonInput['action'] === 'add_form_field') {
             handleAddFormField($db, $jsonInput);
+            return;
+        }
+        
+        if (isset($jsonInput['action']) && $jsonInput['action'] === 'update_form_field') {
+            handleUpdateFormField($db, $jsonInput);
             return;
         }
         
@@ -368,6 +373,71 @@ function handleAddFormField($db, $input) {
             ]);
         } else {
             throw new Exception('Failed to add form field');
+        }
+    } catch (Exception $e) {
+        http_response_code(400);
+        echo json_encode(["success" => false, "message" => $e->getMessage()]);
+    }
+}
+
+function handleUpdateFormField($db, $input) {
+    try {
+        $fieldId = $input['field_id'] ?? null;
+        $fieldName = $input['field_name'] ?? null;
+        $fieldType = $input['field_type'] ?? null;
+        $isRequired = $input['is_required'] ?? null;
+        
+        if (!$fieldId) {
+            throw new Exception('Field ID is required');
+        }
+        
+        // Check if field exists
+        $checkQuery = "SELECT id FROM document_form_fields WHERE id = :id";
+        $checkStmt = $db->prepare($checkQuery);
+        $checkStmt->bindParam(':id', $fieldId);
+        $checkStmt->execute();
+        
+        if ($checkStmt->rowCount() === 0) {
+            throw new Exception('Form field not found');
+        }
+        
+        // Build update query dynamically based on provided fields
+        $updates = [];
+        $params = [':id' => $fieldId];
+        
+        if ($fieldName !== null) {
+            $updates[] = "field_name = :field_name";
+            $params[':field_name'] = $fieldName;
+        }
+        
+        if ($fieldType !== null) {
+            $updates[] = "field_type = :field_type";
+            $params[':field_type'] = $fieldType;
+        }
+        
+        if ($isRequired !== null) {
+            $updates[] = "is_required = :is_required";
+            $params[':is_required'] = (int)$isRequired;
+        }
+        
+        if (empty($updates)) {
+            throw new Exception('No fields to update');
+        }
+        
+        $updateQuery = "UPDATE document_form_fields SET " . implode(', ', $updates) . " WHERE id = :id";
+        $updateStmt = $db->prepare($updateQuery);
+        
+        foreach ($params as $key => $value) {
+            $updateStmt->bindValue($key, $value);
+        }
+        
+        if ($updateStmt->execute()) {
+            echo json_encode([
+                'success' => true,
+                'message' => 'Form field updated successfully'
+            ]);
+        } else {
+            throw new Exception('Failed to update form field');
         }
     } catch (Exception $e) {
         http_response_code(400);

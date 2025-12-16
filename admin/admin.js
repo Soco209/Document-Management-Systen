@@ -400,6 +400,19 @@ const apiService = {
         });
     },
 
+    async updateFormField(fieldId, fieldData) {
+        return await this.makeRequest('/documents/manage.php', {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'update_form_field',
+                field_id: fieldId,
+                field_name: fieldData.field_name,
+                field_type: fieldData.field_type,
+                is_required: fieldData.is_required ? 1 : 0
+            })
+        });
+    },
+
     async deleteFormField(fieldId) {
         return await this.makeRequest('/documents/manage.php', {
             method: 'DELETE',
@@ -1240,17 +1253,26 @@ async function updateExistingDocumentType() {
     try {
         const result = await apiService.updateDocumentType(docTypeId, formData);
         if (result.success) {
-            // Save any new form fields (ones without IDs)
+            // Save form fields (new and updated)
             const formFields = currentEditingDocType.form_fields || [];
             for (let field of formFields) {
-                // If form field doesn't have an ID, it's new - save it
                 if (!field.id) {
+                    // If form field doesn't have an ID, it's new - save it
                     console.log('Saving new form field:', field.field_name);
                     try {
                         await apiService.addFormField(docTypeId, field);
                     } catch (fieldError) {
                         console.error('Failed to save form field:', fieldError);
                         showAdminNotification(`Warning: Failed to save form field "${field.field_name}"`, 'error');
+                    }
+                } else {
+                    // If form field has an ID, it's existing - update it
+                    console.log('Updating existing form field:', field.field_name);
+                    try {
+                        await apiService.updateFormField(field.id, field);
+                    } catch (fieldError) {
+                        console.error('Failed to update form field:', fieldError);
+                        showAdminNotification(`Warning: Failed to update form field "${field.field_name}"`, 'error');
                     }
                 }
             }

@@ -54,15 +54,24 @@
         .email-footer p {
             margin: 0;
         }
-        .button, .button:visited {
-            display: inline-block;
+        .footer{
+            padding: 20px;
+            text-align: center;
+            font-size: 14px;
+            margin: 0;
+        }
+        .button, .button:visited, a {
+            display: inline-block; 
             padding: 0.5rem 2rem;
             margin: 20px 0;
-            background-color: #00b33fff; /* A slightly lighter blue */
+            background-color: #00b33fff;
             color: #ffffff !important;
             text-decoration: none;
             border-radius: 5px;
             font-weight: bold;
+            text-align: center; 
+            width: 100%; 
+            box-sizing: border-box;
         }
     </style>
 </head>
@@ -75,12 +84,16 @@
         <div class="email-body">
             <h2><?php echo $subject; ?></h2>
             <?php echo $bodyContent; ?>
-            <div style="text-align: center;">
-                <a href="http://localhost/student_affairs/Login/login.html" class="button">Go to Website</a>
+
+            <a href="http://localhost/student_affairs/Login/login.html" class="button">Go to Website</a>
+
+    <div class="footer">
+        <p>If you have any questions, please don't hesitate to contact the DSA office.</p>
+        <p>Thank you,</p>
+        <p><strong>The JHCSC Student Council Team</strong></p>
+    </div>
             </div>
-            <p>If you have any questions, please don't hesitate to contact the DSA office.</p>
-            <p>Thank you,</p>
-            <p><strong>The JHCSC Student Council Team</strong></p>
+            </div>  
         </div>
         <div class="email-footer">
             <p>&copy; <?php echo date("Y"); ?> JHC Student Council. All rights reserved.</p>

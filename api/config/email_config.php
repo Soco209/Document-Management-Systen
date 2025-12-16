@@ -24,7 +24,7 @@ return [
     'smtp_password' => 'dbcbyybapngqtlet',     // Your app password (NOT your regular password!)
     
     // Sender Information
-    'from_email' => 'gaminghr@gmail.com',     // From email address
+    'from_email' => 'JhcscDSA@gmail.com',     // From email address
     'from_name' => 'JHCSC DSA Student Council', // From name
     
     // Reply-To (optional)
